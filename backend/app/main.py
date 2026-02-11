@@ -8,11 +8,13 @@ from app.api.routes.agents import router as agents_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.bank import router as bank_router
 from app.api.routes.documents import router as documents_router
+from app.api.routes.emails import router as emails_router
 from app.api.routes.goals import router as goals_router
 from app.api.routes.health import router as health_router
 from app.api.routes.journeys import router as journeys_router
 from app.api.routes.organizations import router as organizations_router
 from app.api.routes.perspectives import router as perspectives_router
+from app.api.routes.vibes import router as vibes_router
 from app.core.config import settings
 from app.core.errors import AppError
 from app.core.middleware import RequestIDMiddleware
@@ -61,3 +63,5 @@ app.include_router(perspectives_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
 app.include_router(bank_router, prefix="/api")
 app.include_router(agents_router, prefix="/api")
+app.include_router(emails_router, prefix="/api")
+app.include_router(vibes_router, prefix="/api")
