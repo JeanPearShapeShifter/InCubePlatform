@@ -121,6 +121,39 @@ export interface Document {
   created_at: string;
 }
 
+// VDBA entities
+export interface Vdba {
+  id: string;
+  title: string;
+  description: string;
+  journey_id: string;
+  bank_instance_id: string;
+  published_at: string;
+  export_url: string | null;
+  export_format: "pdf" | "docx" | "json";
+  version: number;
+}
+
+export interface JourneyAnalytics {
+  journey_id: string;
+  perspectives_completed: number;
+  perspectives_total: number;
+  progress_pct: number;
+  total_cost_cents: number;
+  agent_sessions_count: number;
+}
+
+export interface DashboardStats {
+  total_journeys: number;
+  active_journeys: number;
+  completed_journeys: number;
+  total_vdbas: number;
+  total_cost_cents: number;
+  total_vibes: number;
+  total_emails: number;
+  recent_vdbas: Vdba[];
+}
+
 // API responses
 export interface HealthResponse {
   status: "healthy" | "degraded";
