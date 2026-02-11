@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes.agents import router as agents_router
+from app.api.routes.analytics import router as analytics_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.bank import router as bank_router
 from app.api.routes.documents import router as documents_router
@@ -15,6 +16,7 @@ from app.api.routes.journeys import router as journeys_router
 from app.api.routes.organizations import router as organizations_router
 from app.api.routes.perspectives import router as perspectives_router
 from app.api.routes.settings import router as settings_router
+from app.api.routes.vdbas import router as vdbas_router
 from app.api.routes.vibes import router as vibes_router
 from app.core.config import settings
 from app.core.errors import AppError
@@ -67,3 +69,5 @@ app.include_router(agents_router, prefix="/api")
 app.include_router(emails_router, prefix="/api")
 app.include_router(vibes_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
+app.include_router(vdbas_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
