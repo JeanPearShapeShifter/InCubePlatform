@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sheet";
 import { useCanvasStore, AGENTS } from "@/stores/canvas-store";
 import type { AgentOutput } from "@/stores/canvas-store";
+import { useJourneyStore } from "@/stores/journey-store";
 import { connectSSE } from "@/lib/sse";
 import type { AgentName } from "@/types";
 
@@ -46,6 +47,8 @@ export function BoomerangPanel({
     stopBoomerang,
     setAgentOutput,
   } = useCanvasStore();
+  const { updatePerspectiveStatus, fetchPerspectives, activeJourney } =
+    useJourneyStore();
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -87,6 +90,13 @@ export function BoomerangPanel({
                 break;
               case "boomerang_complete":
                 stopBoomerang();
+                if (perspectiveId) {
+                  updatePerspectiveStatus(perspectiveId, "completed").then(() => {
+                    if (activeJourney) {
+                      fetchPerspectives(activeJourney.id);
+                    }
+                  });
+                }
                 break;
             }
           } catch {

@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderOpen, Mic, Mail, Rocket, Loader2 } from "lucide-react";
+import { FolderOpen, Mic, Mail, Rocket, Loader2, Vault } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -15,6 +15,7 @@ interface ActionBarProps {
   onDocuments?: () => void;
   onVibe?: () => void;
   onEmail?: () => void;
+  onBank?: () => void;
 }
 
 export function ActionBar({
@@ -22,9 +23,16 @@ export function ActionBar({
   onDocuments,
   onVibe,
   onEmail,
+  onBank,
 }: ActionBarProps) {
   const isBoomerangRunning = useCanvasStore((s) => s.isBoomerangRunning);
   const activePerspective = useCanvasStore((s) => s.activePerspective);
+  const agentOutputs = useCanvasStore((s) => s.agentOutputs);
+
+  // Bank is enabled when there are completed agent outputs and boomerang is not running
+  const hasCompletedOutputs =
+    Object.values(agentOutputs).some((o) => o.status === "complete") &&
+    !isBoomerangRunning;
 
   const actions = [
     {
@@ -90,6 +98,26 @@ export function ActionBar({
             {activePerspective
               ? "Launch all 9 agents"
               : "Select a perspective first"}
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              onClick={onBank}
+              disabled={!hasCompletedOutputs}
+              className="gap-2"
+              size="sm"
+            >
+              <Vault className="h-4 w-4" />
+              <span className="hidden sm:inline">Bank</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {hasCompletedOutputs
+              ? "Bank this perspective's results"
+              : "Complete a boomerang first"}
           </TooltipContent>
         </Tooltip>
       </div>

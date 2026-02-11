@@ -60,7 +60,7 @@ Locate and understand:
 ```
 Error: Plan not found at $ARGUMENTS
 
-Create a plan first: /prp-plan "feature description"
+Create a plan first: /at-build:plan "feature description"
 ```
 
 **PHASE_1_CHECKPOINT:**

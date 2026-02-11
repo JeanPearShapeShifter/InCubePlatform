@@ -389,7 +389,7 @@ After generating, report:
 
 ### To Start Implementation
 
-Run: `/prp-plan .claude/PRPs/prds/{project}/{name}.prd.md`
+Run: `/at-build:plan .claude/PRPs/prds/{project}/{name}.prd.md`
 
 This will automatically select the next pending phase and create an implementation plan.
 ```

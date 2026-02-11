@@ -2,8 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
-import type { DashboardStats, Journey } from "@/types";
-import { Button } from "@/components/ui/button";
+import type { DashboardStats, Goal, Journey } from "@/types";
 import {
   Card,
   CardContent,
@@ -14,7 +13,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { Plus, Rocket, Briefcase, Zap, Globe, DollarSign, FileText } from "lucide-react";
+import { NewJourneyDialog } from "@/components/dashboard/new-journey-dialog";
+import { Rocket, Briefcase, Zap, Globe, DollarSign, FileText } from "lucide-react";
 import Link from "next/link";
 
 const statusColors: Record<string, string> = {
@@ -46,6 +46,26 @@ export default function DashboardPage() {
       ),
   });
 
+  const goalIds = journeys?.map((j) => j.goal_id).filter(Boolean) ?? [];
+  const { data: goalsMap } = useQuery({
+    queryKey: ["goals", goalIds],
+    queryFn: async () => {
+      const map: Record<string, Goal> = {};
+      await Promise.all(
+        goalIds.map(async (id) => {
+          try {
+            const goal = await apiGet<Goal>(`/api/goals/${id}`);
+            map[id] = goal;
+          } catch {
+            // goal may have been deleted
+          }
+        }),
+      );
+      return map;
+    },
+    enabled: goalIds.length > 0,
+  });
+
   const isLoading = journeysLoading || statsLoading;
 
   function formatCost(cents: number): string {
@@ -61,12 +81,7 @@ export default function DashboardPage() {
             Your active journeys and transformation progress
           </p>
         </div>
-        <Button asChild>
-          <Link href="/canvas">
-            <Plus className="mr-2 h-4 w-4" />
-            New Journey
-          </Link>
-        </Button>
+        <NewJourneyDialog />
       </div>
 
       {/* Stats row */}
@@ -143,8 +158,8 @@ export default function DashboardPage() {
                   <Card className="transition-colors hover:border-primary/50">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
-                        <CardTitle className="text-base">
-                          Journey
+                        <CardTitle className="text-base truncate mr-2">
+                          {goalsMap?.[journey.goal_id]?.title ?? "Journey"}
                         </CardTitle>
                         <Badge
                           variant="outline"
@@ -177,12 +192,9 @@ export default function DashboardPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Start your first business transformation journey
               </p>
-              <Button className="mt-4" asChild>
-                <Link href="/canvas">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Journey
-                </Link>
-              </Button>
+              <div className="mt-4">
+                <NewJourneyDialog />
+              </div>
             </CardContent>
           </Card>
         )}

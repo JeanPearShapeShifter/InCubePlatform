@@ -1,6 +1,6 @@
 ---
 description: Create comprehensive feature implementation plan with codebase analysis and research
-argument-hint: <feature description | path/to/prd.md>
+argument-hint: <feature description | path/to/prd.md | path/to/package-dir>
 ---
 
 <objective>
@@ -34,6 +34,7 @@ CLAUDE.md rules: @CLAUDE.md
 |---------------|------|--------|
 | Ends with `.prd.md` | PRD file | Parse PRD, select next phase |
 | Ends with `.md` and contains "Implementation Phases" | PRD file | Parse PRD, select next phase |
+| Directory path containing a `README.md` | Doc-core package | Read all docs, extract feature scope |
 | File path that exists | Document | Read and extract feature description |
 | Free-form text | Description | Use directly as feature input |
 | Empty/blank | Conversation | Use conversation context as input |
@@ -67,6 +68,24 @@ CLAUDE.md rules: @CLAUDE.md
    Proceeding with Phase #{number}...
    ```
 
+### If Doc-Core Package Detected:
+
+1. **Read ALL documents** in the package directory
+2. **Parse `01-prd.md`** for implementation phases or feature priority matrix
+3. **Select next actionable phase/feature:**
+   - If `01-prd.md` has a phase table: select first pending phase with met dependencies
+   - If `01-prd.md` has a Feature Priority Matrix: select highest-priority unimplemented feature
+   - If neither: treat the entire PRD scope as a single implementation phase
+4. **Pass ALL documents as context** to Phase 2 (Explore)
+5. **Report to user:**
+   ```
+   Doc-core package: {package-path}
+   Documents found: {list of .md files}
+   Selected scope: {phase/feature or "full package"}
+
+   Proceeding with plan generation from package...
+   ```
+
 ### If Free-form or Conversation Context:
 
 - Proceed directly to Phase 1 with the input as feature description
@@ -74,6 +93,7 @@ CLAUDE.md rules: @CLAUDE.md
 **PHASE_0_CHECKPOINT:**
 - [ ] Input type determined
 - [ ] If PRD: next phase selected and dependencies verified
+- [ ] If package: all documents read, scope selected
 - [ ] Feature description ready for Phase 1
 
 ---
@@ -128,6 +148,20 @@ DISCOVER:
 8. Dependencies - relevant libraries already in use
 
 Return ACTUAL code snippets from codebase, not generic examples.
+```
+
+**If working from a doc-core package**, include in the Explore agent prompt:
+```
+In addition to codebase exploration, this plan is derived from a documentation
+package at {package-path}. The package contains detailed specifications:
+- Database schema: {package-path}/03-data-model.md
+- API contracts: {package-path}/04-api-specification.md
+- UI specs: {package-path}/07-ux-specification.md
+- Test strategy: {package-path}/08-test-strategy.md
+
+Use these documents as authoritative source for implementation details.
+Cross-reference codebase patterns with the package specifications to identify
+any conflicts or gaps between existing code and the documented design.
 ```
 
 **DOCUMENT discoveries in table format:**
@@ -292,15 +326,48 @@ So that {benefit}
 
 ---
 
+## Package Reference
+
+{Include this section ONLY when plan was generated from a doc-core package. Omit for PRD/free-form input.}
+
+This plan was generated from doc-core package: `{package-path}`
+
+| Document | Relevant Sections |
+|----------|------------------|
+| 01-prd.md | {specific sections used} |
+| 02-system-architecture.md | {architecture decisions relevant to this feature} |
+| 03-data-model.md | {entities relevant to this feature} |
+| 04-api-specification.md | {endpoints relevant to this feature} |
+| 05-user-flows.md | {user journeys relevant to this feature} |
+| 07-ux-specification.md | {screens relevant to this feature} |
+| 08-test-strategy.md | {test patterns relevant to this feature} |
+| 09-deployment-architecture.md | {infra relevant to this feature} |
+| 10-security-assessment.md | {security considerations for this feature} |
+
+---
+
 ## Mandatory Reading
 
 **CRITICAL: Implementation agent MUST read these files before starting any task:**
+
+{For PRD/free-form input:}
 
 | Priority | File | Lines | Why Read This |
 |----------|------|-------|---------------|
 | P0 | `path/to/critical.py` | 10-50 | Pattern to MIRROR exactly |
 | P1 | `path/to/types.ts` | 1-30 | Types to IMPORT |
 | P2 | `path/to/test.py` | all | Test pattern to FOLLOW |
+
+{For doc-core package input — include package docs as P0/P1 reading:}
+
+| Priority | File | Why Read This |
+|----------|------|---------------|
+| P0 | `{package-path}/03-data-model.md` | DB schema to implement |
+| P0 | `{package-path}/04-api-specification.md` | API contracts to follow |
+| P1 | `{package-path}/07-ux-specification.md` | UI specs to match |
+| P1 | `{package-path}/08-test-strategy.md` | Test patterns to follow |
+| P1 | `{package-path}/02-system-architecture.md` | Architecture decisions to respect |
+| P2 | `{codebase file}` | Existing pattern to MIRROR |
 
 ---
 
