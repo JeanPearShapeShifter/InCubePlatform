@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: incube-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: incube
+      POSTGRES_USER: incube
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - /mnt/motionmind_volume/incube/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U incube -d incube"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - motionmind
+
+  redis:
+    image: redis:7-alpine
+    container_name: incube-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - motionmind
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    container_name: incube-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://incube:${POSTGRES_PASSWORD}@incube-postgres:5432/incube
+      REDIS_URL: redis://incube-redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@incube.ai}
+      DEFAULT_AGENT_MODEL: ${DEFAULT_AGENT_MODEL:-claude-haiku-4-5-20251001}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: incube-documents
+      CORS_ORIGINS: https://incube.motionmind.antikythera.co.za
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    networks:
+      - motionmind
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.frontend
+    container_name: incube-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - motionmind
+
+networks:
+  motionmind:
+    external: true
+    name: n8n-docker-caddy_motionmind-network
