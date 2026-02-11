@@ -50,7 +50,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <span className="text-lg font-bold tracking-tight">InCube</span>
         </div>
 
-        <nav className="space-y-1 px-2 py-4">
+        <nav className="space-y-1 px-2 py-4" role="navigation" aria-label="Main navigation">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
@@ -59,6 +59,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 onClick={onClose}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                   isActive

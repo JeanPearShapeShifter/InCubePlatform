@@ -31,6 +31,8 @@ export function AgentCard({ agentName, output }: AgentCardProps) {
 
   return (
     <Card
+      role="article"
+      aria-label={`Agent ${meta.label} — ${meta.role}`}
       className={cn(
         "flex flex-col overflow-hidden transition-all",
         isAxiom && "border-[var(--color-agent-axiom)]",
