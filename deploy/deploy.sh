@@ -34,6 +34,7 @@ fi
 
 # ── 3. Create data directories ──────────────────────────────────────
 mkdir -p "$INSTALL_DIR/pgdata"
+mkdir -p "$INSTALL_DIR/minio_data"
 
 # ── 4. Build and start containers ───────────────────────────────────
 echo "→ Building and starting containers..."

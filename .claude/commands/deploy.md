@@ -33,7 +33,7 @@ Deploy InCube Platform to the Motion Mind Linode VPS using Docker containers wit
 | `incube-redis` | redis:7-alpine | 6379 | Ephemeral |
 | `incube-backend` | Built from `deploy/Dockerfile.backend` | 8000 | — |
 | `incube-frontend` | Built from `deploy/Dockerfile.frontend` | 3001 | — |
-| `minio` | *(existing, shared)* | 9000 | Reused from motionmind stack |
+| `incube-minio` | minio/minio | 9000 | `/mnt/motionmind_volume/incube/minio_data` |
 | `caddy` | *(existing, shared)* | 80/443 | Routes `incube.motionmind.antikythera.co.za` |
 
 All containers join the external `n8n-docker-caddy_motionmind-network`. No ports are exposed to host — Caddy handles all external traffic.
@@ -359,8 +359,8 @@ Report to the user:
 If this is the first deployment, remind the user:
 
 1. **DNS**: Ensure A record `incube.motionmind.antikythera.co.za` → `159.223.208.109` exists (or wildcard `*.motionmind.antikythera.co.za`)
-2. **Secrets**: Create `.env.production` on the server with real values
-3. **MinIO credentials**: Get access/secret keys from existing MinIO instance on the server
+2. **Secrets**: Create `.env.production` on the server — generate all credentials fresh with `openssl rand -hex`
+3. **ANTHROPIC_API_KEY**: Add the API key to `.env.production` if AI agent features are needed
 
 ## Common Issues & Solutions
 
