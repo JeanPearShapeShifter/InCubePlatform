@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.venv/
+
+# Build outputs
+.next/
+dist/
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+.env.local
+.env.production
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Cache
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Docker volumes (local)
+pgdata/
+minio_data/
