@@ -38,7 +38,7 @@ export function HeatMap({ compact }: HeatMapProps) {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="space-y-1">
+      <div className="space-y-1" role="grid" aria-label="Perspective heat map">
         {/* Column headers */}
         {!compact && (
           <div className="grid grid-cols-[auto_repeat(4,1fr)] gap-1">
@@ -80,6 +80,8 @@ export function HeatMap({ compact }: HeatMapProps) {
                 <Tooltip key={phase.type}>
                   <TooltipTrigger asChild>
                     <button
+                      role="gridcell"
+                      aria-label={`${dim.label} ${phase.label}: ${status.replace("_", " ")}`}
                       onClick={() =>
                         setActivePerspective({
                           dimension: dim.type,

@@ -18,6 +18,7 @@ import {
 import { Menu, LogOut, Settings, User, Sun } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { NotificationBell } from "./notification-bell";
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -64,7 +65,9 @@ export function Header({ onMenuToggle }: HeaderProps) {
         </Link>
       </div>
 
-      <DropdownMenu>
+      <div className="flex items-center gap-1">
+        <NotificationBell />
+        <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
@@ -117,6 +120,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
     </header>
   );
 }

@@ -127,7 +127,7 @@ export function BoomerangPanel({
         </SheetHeader>
 
         <div className="mt-4 space-y-4">
-          <div className="space-y-1">
+          <div className="space-y-1" role="status" aria-label="Boomerang progress">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Progress</span>
               <span className="font-medium">
@@ -138,7 +138,7 @@ export function BoomerangPanel({
           </div>
 
           <ScrollArea className="h-[calc(100vh-200px)]">
-            <div className="space-y-2 pr-4">
+            <div className="space-y-2 pr-4" aria-live="polite">
               {agents.map((agent) => {
                 const output = agentOutputs[agent.name];
                 const status = output?.status ?? "pending";

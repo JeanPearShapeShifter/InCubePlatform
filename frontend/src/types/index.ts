@@ -165,3 +165,16 @@ export interface ServiceCheck {
   status: "up" | "down";
   latency_ms: number;
 }
+
+export interface Notification {
+  id: string;
+  title: string;
+  body: string;
+  link: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationCount {
+  unread: number;
+}
