@@ -27,8 +27,9 @@ export type AgentName =
 export interface User {
   id: string;
   email: string;
-  full_name: string;
+  name: string;
   role: UserRole;
+  avatar_url: string | null;
   organization_id: string;
   created_at: string;
 }
@@ -42,12 +43,13 @@ export interface Organization {
 
 export interface Journey {
   id: string;
-  title: string;
-  status: JourneyStatus;
   goal_id: string;
   organization_id: string;
+  status: JourneyStatus;
+  perspectives_completed: number;
+  total_cost_cents: number;
   created_at: string;
-  updated_at: string;
+  completed_at: string | null;
 }
 
 export interface Goal {

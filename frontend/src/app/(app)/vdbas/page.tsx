@@ -10,7 +10,8 @@ import { Globe } from "lucide-react";
 export default function VdbasPage() {
   const { data: vdbas, isLoading } = useQuery({
     queryKey: ["vdbas"],
-    queryFn: () => apiGet<Vdba[]>("/api/vdbas"),
+    queryFn: () =>
+      apiGet<{ data: Vdba[] }>("/api/vdbas").then((res) => res.data),
   });
 
   return (

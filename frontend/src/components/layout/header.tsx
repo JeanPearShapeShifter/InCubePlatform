@@ -35,8 +35,8 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const { theme, setTheme } = useThemeStore();
   const router = useRouter();
 
-  const initials = user?.full_name
-    ? user.full_name
+  const initials = user?.name
+    ? user.name
         .split(" ")
         .map((n) => n[0])
         .join("")
@@ -80,7 +80,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium">{user?.full_name ?? "User"}</p>
+              <p className="text-sm font-medium">{user?.name ?? "User"}</p>
               <p className="text-xs text-muted-foreground">
                 {user?.email ?? ""}
               </p>

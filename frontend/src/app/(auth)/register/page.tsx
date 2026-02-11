@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card";
 
 const registerSchema = z.object({
-  full_name: z.string().min(2, "Name must be at least 2 characters"),
+  name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
   password: z
     .string()
@@ -70,20 +70,20 @@ export default function RegisterPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="full_name">Full name</Label>
+            <Label htmlFor="name">Full name</Label>
             <Input
-              id="full_name"
+              id="name"
               placeholder="Jane Doe"
               autoComplete="name"
-              {...register("full_name")}
+              {...register("name")}
               onChange={(e) => {
-                register("full_name").onChange(e);
+                register("name").onChange(e);
                 clearError();
               }}
             />
-            {errors.full_name && (
+            {errors.name && (
               <p className="text-xs text-destructive">
-                {errors.full_name.message}
+                {errors.name.message}
               </p>
             )}
           </div>

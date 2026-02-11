@@ -23,7 +23,10 @@ export default function BankPage() {
 
   const { data: journeys, isLoading: journeysLoading } = useQuery({
     queryKey: ["journeys"],
-    queryFn: () => apiGet<Journey[]>("/api/journeys"),
+    queryFn: () =>
+      apiGet<{ journeys: Journey[]; pagination: unknown }>("/api/journeys").then(
+        (res) => res.journeys,
+      ),
   });
 
   // Auto-select the first journey if none selected
@@ -65,7 +68,7 @@ export default function BankPage() {
           >
             {journeys.map((journey) => (
               <option key={journey.id} value={journey.id}>
-                {journey.title}
+                Journey — {new Date(journey.created_at).toLocaleDateString()}
               </option>
             ))}
           </select>

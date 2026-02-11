@@ -33,7 +33,8 @@ export default function VdbaDetailPage() {
 
   const { data: vdba, isLoading } = useQuery({
     queryKey: ["vdba", params.id],
-    queryFn: () => apiGet<Vdba>(`/api/vdbas/${params.id}`),
+    queryFn: () =>
+      apiGet<{ data: Vdba }>(`/api/vdbas/${params.id}`).then((res) => res.data),
     enabled: !!params.id,
   });
 
