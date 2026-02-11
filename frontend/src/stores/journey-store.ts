@@ -28,8 +28,8 @@ export const useJourneyStore = create<JourneyState & JourneyActions>(
     fetchJourneys: async () => {
       set({ isLoading: true });
       try {
-        const journeys = await apiGet<Journey[]>("/api/journeys");
-        set({ journeys, isLoading: false });
+        const res = await apiGet<{ journeys: Journey[]; pagination: unknown }>("/api/journeys");
+        set({ journeys: res.journeys, isLoading: false });
       } catch {
         set({ isLoading: false });
       }

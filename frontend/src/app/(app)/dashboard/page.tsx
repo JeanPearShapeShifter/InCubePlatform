@@ -32,12 +32,18 @@ const formatColors: Record<string, string> = {
 export default function DashboardPage() {
   const { data: journeys, isLoading: journeysLoading } = useQuery({
     queryKey: ["journeys"],
-    queryFn: () => apiGet<Journey[]>("/api/journeys"),
+    queryFn: () =>
+      apiGet<{ journeys: Journey[]; pagination: unknown }>("/api/journeys").then(
+        (res) => res.journeys,
+      ),
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["dashboard-stats"],
-    queryFn: () => apiGet<DashboardStats>("/api/analytics/dashboard"),
+    queryFn: () =>
+      apiGet<{ data: DashboardStats }>("/api/analytics/dashboard").then(
+        (res) => res.data,
+      ),
   });
 
   const isLoading = journeysLoading || statsLoading;
@@ -127,8 +133,7 @@ export default function DashboardPage() {
         ) : journeys && journeys.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {journeys.map((journey) => {
-              const perspectivesCompleted = 0;
-              const progressPct = (perspectivesCompleted / 12) * 100;
+              const progressPct = (journey.perspectives_completed / 12) * 100;
 
               return (
                 <Link
@@ -139,7 +144,7 @@ export default function DashboardPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <CardTitle className="text-base">
-                          {journey.title}
+                          Journey
                         </CardTitle>
                         <Badge
                           variant="outline"
@@ -156,7 +161,7 @@ export default function DashboardPage() {
                     <CardContent>
                       <Progress value={progressPct} />
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {perspectivesCompleted} / 12 perspectives completed
+                        {journey.perspectives_completed} / 12 perspectives completed
                       </p>
                     </CardContent>
                   </Card>

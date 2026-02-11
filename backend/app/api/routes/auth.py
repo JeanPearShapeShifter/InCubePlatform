@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.core.config import settings
 from app.core.security import create_access_token
 from app.models.organization import Organization
 from app.models.user import User
@@ -29,7 +30,7 @@ async def register(data: RegisterRequest, response: Response, db: AsyncSession =
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,
+        secure=settings.environment == "production",
         samesite="lax",
         max_age=60 * 60 * 24 * 7,  # 7 days
     )
@@ -43,7 +44,7 @@ async def login(data: LoginRequest, response: Response, db: AsyncSession = Depen
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,
+        secure=settings.environment == "production",
         samesite="lax",
         max_age=60 * 60 * 24 * 7,  # 7 days
     )

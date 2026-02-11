@@ -4,6 +4,10 @@ import { create } from "zustand";
 import { apiGet, apiPost } from "@/lib/api";
 import type { User, Organization } from "@/types";
 
+interface MeResponse extends User {
+  organization: Organization;
+}
+
 interface AuthState {
   user: User | null;
   organization: Organization | null;
@@ -17,7 +21,7 @@ interface AuthActions {
   register: (data: {
     email: string;
     password: string;
-    full_name: string;
+    name: string;
     organization_name: string;
   }) => Promise<void>;
   logout: () => Promise<void>;
@@ -36,8 +40,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await apiPost("/api/auth/login", { email, password });
-      const user = await apiGet<User>("/api/auth/me");
-      set({ user, isAuthenticated: true, isLoading: false });
+      const me = await apiGet<MeResponse>("/api/auth/me");
+      set({ user: me, organization: me.organization, isAuthenticated: true, isLoading: false });
     } catch (err) {
       set({
         isLoading: false,
@@ -51,8 +55,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await apiPost("/api/auth/register", data);
-      const user = await apiGet<User>("/api/auth/me");
-      set({ user, isAuthenticated: true, isLoading: false });
+      const me = await apiGet<MeResponse>("/api/auth/me");
+      set({ user: me, organization: me.organization, isAuthenticated: true, isLoading: false });
     } catch (err) {
       set({
         isLoading: false,
@@ -78,10 +82,10 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   fetchMe: async () => {
     set({ isLoading: true });
     try {
-      const user = await apiGet<User>("/api/auth/me");
-      set({ user, isAuthenticated: true, isLoading: false });
+      const me = await apiGet<MeResponse>("/api/auth/me");
+      set({ user: me, organization: me.organization, isAuthenticated: true, isLoading: false });
     } catch {
-      set({ user: null, isAuthenticated: false, isLoading: false });
+      set({ user: null, organization: null, isAuthenticated: false, isLoading: false });
     }
   },
 

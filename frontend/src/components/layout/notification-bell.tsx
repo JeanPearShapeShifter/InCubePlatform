@@ -33,15 +33,19 @@ export function NotificationBell() {
 
   const { data: countData } = useQuery({
     queryKey: ["notifications", "unread-count"],
-    queryFn: () => apiGet<NotificationCount>("/api/notifications/unread-count"),
+    queryFn: () =>
+      apiGet<{ data: NotificationCount }>("/api/notifications/unread-count").then(
+        (res) => res.data,
+      ),
     refetchInterval: 30_000,
   });
 
   const { data: notifications } = useQuery({
     queryKey: ["notifications"],
     queryFn: () =>
-      apiGet<{ items: Notification[] }>("/api/notifications?per_page=10"),
-    select: (data) => data.items,
+      apiGet<{ data: Notification[] }>("/api/notifications?per_page=10").then(
+        (res) => res.data,
+      ),
   });
 
   const markRead = useMutation({

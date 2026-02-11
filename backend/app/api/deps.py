@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator, Callable
 from fastapi import Cookie, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import ForbiddenError, ValidationError
+from app.core.errors import ForbiddenError, UnauthorizedError
 from app.db.session import async_session_factory
 from app.models.enums import UserRole
 from app.models.user import User
@@ -38,7 +38,7 @@ async def get_current_user(
         token = authorization[7:]
 
     if not token:
-        raise ValidationError("Not authenticated")
+        raise UnauthorizedError("Not authenticated")
 
     return await auth_service.get_current_user(db, token)
 

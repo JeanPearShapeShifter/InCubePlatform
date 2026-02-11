@@ -21,6 +21,12 @@ class ValidationError(AppError):
     message = "Invalid request"
 
 
+class UnauthorizedError(AppError):
+    status_code = 401
+    code = "UNAUTHORIZED"
+    message = "Not authenticated"
+
+
 class ForbiddenError(AppError):
     status_code = 403
     code = "FORBIDDEN"

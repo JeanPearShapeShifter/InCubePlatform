@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6380"
 
+    # Environment
+    environment: str = "development"
+
     # Auth
     jwt_secret: str = "dev-secret-change-in-production"
     jwt_access_minutes: int = 15
@@ -34,7 +37,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # CORS
-    cors_origins: str = "http://localhost:3001"
+    cors_origins: str = "http://localhost:3001,https://incube.motionmind.antikythera.co.za"
 
 
 settings = Settings()
