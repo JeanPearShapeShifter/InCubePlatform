@@ -9,12 +9,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.core.errors import NotFoundError, ValidationError
 from app.core.sse import sse_event, sse_response
 from app.models.agent_session import AgentSession
 from app.models.axiom_challenge import AxiomChallenge
 from app.models.perspective import Perspective
+from app.models.user import User
 from app.schemas.agent import (
     AgentSessionResponse,
     AxiomChallengeResponse,
@@ -27,9 +28,6 @@ from app.services.agents.orchestrator import BoomerangOrchestrator
 from app.services.agents.prompts import VALID_AGENT_NAMES
 
 router = APIRouter()
-
-
-# TODO: add get_current_user dependency
 
 
 async def _get_perspective(perspective_id: uuid.UUID, db: AsyncSession) -> Perspective:
@@ -46,6 +44,7 @@ async def agent_chat(
     perspective_id: uuid.UUID,
     agent_name: str,
     body: ChatRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Stream a chat response from a single agent via SSE."""
@@ -72,6 +71,7 @@ async def agent_chat(
 async def run_boomerang(
     perspective_id: uuid.UUID,
     body: BoomerangRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Run the full boomerang flow (8 specialists + Axiom) via SSE."""
@@ -101,6 +101,7 @@ async def list_agent_sessions(
     agent: str | None = Query(None, description="Filter by agent name"),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List agent sessions for a perspective."""
@@ -138,6 +139,7 @@ async def list_agent_sessions(
 @router.post("/perspectives/{perspective_id}/axiom/challenge")
 async def trigger_axiom_challenge(
     perspective_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Manually trigger an Axiom challenge against the latest specialist outputs for this perspective.
@@ -192,6 +194,7 @@ async def list_axiom_challenges(
     perspective_id: uuid.UUID,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List Axiom challenges for a perspective."""

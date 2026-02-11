@@ -1,10 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
+from app.models.user import User
 from app.schemas.document import DocumentListResponse, DocumentResponse
 from app.services import document as document_service
 
@@ -15,17 +16,17 @@ router = APIRouter()
 async def upload_document(
     perspective_id: uuid.UUID,
     file: UploadFile = File(...),
-    # TODO: replace with get_current_user dependency
-    user_id: uuid.UUID = Query(...),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentResponse:
-    doc = await document_service.create_document(db, perspective_id, user_id, file)
+    doc = await document_service.create_document(db, perspective_id, current_user.id, file)
     return DocumentResponse.model_validate(doc)
 
 
 @router.get("/perspectives/{perspective_id}/documents", response_model=DocumentListResponse)
 async def list_documents(
     perspective_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentListResponse:
     docs = await document_service.list_documents(db, perspective_id)
@@ -35,6 +36,7 @@ async def list_documents(
 @router.get("/documents/{document_id}/download")
 async def download_document(
     document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     doc, data = await document_service.get_document_content(db, document_id)
@@ -48,6 +50,7 @@ async def download_document(
 @router.delete("/documents/{document_id}", status_code=204)
 async def delete_document(
     document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await document_service.delete_document(db, document_id)

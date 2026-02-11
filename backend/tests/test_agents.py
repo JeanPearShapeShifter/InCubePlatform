@@ -139,8 +139,8 @@ def test_agent_registry_has_all_agents():
 
 
 @pytest.mark.asyncio
-async def test_chat_endpoint_rejects_invalid_agent(agent_client):
-    """Test that invalid agent names are rejected."""
+async def test_chat_endpoint_requires_auth(agent_client):
+    """Test that agent chat endpoint requires authentication."""
     import uuid
 
     fake_id = str(uuid.uuid4())
@@ -150,7 +150,7 @@ async def test_chat_endpoint_rejects_invalid_agent(agent_client):
     )
     assert response.status_code == 400
     data = response.json()
-    assert "invalid" in data["error"]["message"].lower() or "Invalid" in data["error"]["message"]
+    assert "authenticated" in data["error"]["message"].lower()
 
 
 @pytest.mark.asyncio

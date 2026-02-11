@@ -11,6 +11,7 @@ from app.models.journey import Journey
 from app.models.perspective import Perspective
 from app.models.vdba import Vdba
 from app.schemas.vdba import VdbaCreate
+from app.services.notify import notify_vdba_published
 
 
 async def publish_journey(
@@ -18,6 +19,7 @@ async def publish_journey(
     journey_id: uuid.UUID,
     org_id: uuid.UUID,
     body: VdbaCreate,
+    user_id: uuid.UUID | None = None,
 ) -> Vdba:
     """Publish a journey as a VDBA.
 
@@ -98,6 +100,10 @@ async def publish_journey(
     journey.perspectives_completed = 12
 
     await db.flush()
+
+    if user_id:
+        await notify_vdba_published(db, org_id, user_id, body.title)
+
     return vdba
 
 

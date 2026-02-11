@@ -29,7 +29,7 @@ async def publish_journey(
     db: AsyncSession = Depends(get_db),
 ) -> ResponseEnvelope[VdbaResponse]:
     vdba = await vdba_service.publish_journey(
-        db, journey_id, current_user.organization_id, body
+        db, journey_id, current_user.organization_id, body, user_id=current_user.id
     )
     # Trigger export generation
     await export_service.generate_export(db, vdba.id)

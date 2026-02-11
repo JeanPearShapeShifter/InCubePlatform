@@ -1,13 +1,14 @@
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.core.errors import ValidationError
 from app.models.email_log import EmailLog
+from app.models.user import User
 from app.schemas.email import EmailListResponse, EmailLogResponse, SendEmailRequest
 from app.services.email import TEMPLATE_BUILDERS, send_email
 
@@ -18,8 +19,7 @@ router = APIRouter()
 async def send_perspective_email(
     perspective_id: uuid.UUID,
     data: SendEmailRequest,
-    # TODO: replace with get_current_user dependency
-    user_id: uuid.UUID = Query(...),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> EmailLogResponse:
     builder = TEMPLATE_BUILDERS.get(data.template_type.value)
@@ -38,7 +38,7 @@ async def send_perspective_email(
 
     log = EmailLog(
         perspective_id=perspective_id,
-        sent_by=user_id,
+        sent_by=current_user.id,
         recipient_email=data.recipient_email,
         template_type=data.template_type.value,
         subject=subject,
@@ -56,6 +56,7 @@ async def send_perspective_email(
 @router.get("/perspectives/{perspective_id}/emails", response_model=EmailListResponse)
 async def list_emails(
     perspective_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> EmailListResponse:
     result = await db.execute(
