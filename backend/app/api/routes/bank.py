@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.schemas.bank import BankCreate, BankInstanceResponse, BankTimelineResponse
+from app.schemas.bank import BankCreate, BankInstanceDetail, BankInstanceResponse, BankTimelineResponse
 from app.services import bank as bank_service
 
 router = APIRouter()
@@ -16,7 +16,19 @@ async def create_bank_instance(
     data: BankCreate,
     db: AsyncSession = Depends(get_db),
 ) -> BankInstanceResponse:
-    bank = await bank_service.create_bank_instance(db, perspective_id, data.synopsis)
+    # Convert typed schemas to dicts for JSONB storage
+    agent_assessments = (
+        {k: v.model_dump() for k, v in data.agent_assessments.items()} if data.agent_assessments else None
+    )
+    decision_audit = [entry.model_dump() for entry in data.decision_audit] if data.decision_audit else None
+
+    bank = await bank_service.create_bank_instance(
+        db,
+        perspective_id,
+        data.synopsis,
+        agent_assessments=agent_assessments,
+        decision_audit=decision_audit,
+    )
     return BankInstanceResponse.model_validate(bank)
 
 
@@ -36,3 +48,12 @@ async def get_bank_instance(
 ) -> BankInstanceResponse:
     bank = await bank_service.get_bank_instance(db, bank_id)
     return BankInstanceResponse.model_validate(bank)
+
+
+@router.get("/bank/{bank_id}/detail", response_model=BankInstanceDetail)
+async def get_bank_instance_detail(
+    bank_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> BankInstanceDetail:
+    bank = await bank_service.get_bank_instance(db, bank_id)
+    return BankInstanceDetail.model_validate(bank)
