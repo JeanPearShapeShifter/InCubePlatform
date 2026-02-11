@@ -5,9 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
 import type { BankTimelineResponse, BankType, Journey } from "@/types";
 import { BankTimeline } from "@/components/bank/timeline";
+import { PublishDialog } from "@/components/bank/publish-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Vault, Filter } from "lucide-react";
+import { Vault, Filter, Globe } from "lucide-react";
 
 const typeFilters: { value: BankType | "all"; label: string }[] = [
   { value: "all", label: "All" },
@@ -20,6 +22,7 @@ const typeFilters: { value: BankType | "all"; label: string }[] = [
 export default function BankPage() {
   const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<BankType | "all">("all");
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
 
   const { data: journeys, isLoading: journeysLoading } = useQuery({
     queryKey: ["journeys"],
@@ -47,11 +50,19 @@ export default function BankPage() {
 
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Bank</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Timeline of banked artefacts from your transformation journeys
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Bank</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Timeline of banked artefacts from your transformation journeys
+          </p>
+        </div>
+        {activeJourneyId && bankData && bankData.bank_instances.length > 0 && (
+          <Button onClick={() => setPublishDialogOpen(true)}>
+            <Globe className="mr-2 h-4 w-4" />
+            Publish VDBA
+          </Button>
+        )}
       </div>
 
       {/* Journey selector */}
@@ -124,6 +135,15 @@ export default function BankPage() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Publish VDBA dialog */}
+      {activeJourneyId && (
+        <PublishDialog
+          open={publishDialogOpen}
+          onOpenChange={setPublishDialogOpen}
+          journeyId={activeJourneyId}
+        />
       )}
     </div>
   );

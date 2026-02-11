@@ -1,17 +1,21 @@
 "use client";
 
 import { Suspense, useEffect, useCallback, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvas-store";
 import { useJourneyStore } from "@/stores/journey-store";
 import { LeftRail } from "@/components/canvas/left-rail";
 import { PerspectiveHeader } from "@/components/canvas/perspective-header";
 import { AgentGrid } from "@/components/canvas/agent-grid";
 import { ActionBar } from "@/components/canvas/action-bar";
+import { BankDialog } from "@/components/canvas/bank-dialog";
 import { BoomerangPanel } from "@/components/canvas/boomerang-panel";
+import { Button } from "@/components/ui/button";
 
 function CanvasContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const journeyId = searchParams.get("journey");
 
   const {
@@ -20,17 +24,25 @@ function CanvasContent() {
     activePerspective,
     startBoomerang,
   } = useCanvasStore();
-  const { perspectives, fetchPerspectives, activeJourney, setActiveJourney } =
-    useJourneyStore();
+  const {
+    perspectives,
+    fetchPerspectives,
+    activeJourney,
+    fetchAndSetActiveJourney,
+    isLoading,
+    updatePerspectiveStatus,
+  } = useJourneyStore();
 
   const [boomerangOpen, setBoomerangOpen] = useState(false);
+  const [bankDialogOpen, setBankDialogOpen] = useState(false);
 
   // Sync journey from URL param
   useEffect(() => {
     if (journeyId && journeyId !== activeJourneyId) {
       setActiveJourneyId(journeyId);
-      setActiveJourney(journeyId);
-      fetchPerspectives(journeyId);
+      fetchAndSetActiveJourney(journeyId).then(() => {
+        fetchPerspectives(journeyId);
+      });
     }
   }, [journeyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -46,9 +58,38 @@ function CanvasContent() {
 
   const handleBoomerang = useCallback(() => {
     if (!currentPerspectiveId) return;
+    // Mark perspective as in_progress
+    updatePerspectiveStatus(currentPerspectiveId, "in_progress").then(() => {
+      if (journeyId) fetchPerspectives(journeyId);
+    });
     startBoomerang();
     setBoomerangOpen(true);
-  }, [currentPerspectiveId, startBoomerang]);
+  }, [currentPerspectiveId, startBoomerang, updatePerspectiveStatus, journeyId, fetchPerspectives]);
+
+  // No journey param — show a prompt to go to the dashboard
+  if (!journeyId) {
+    return (
+      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">
+            No journey selected. Open or create a journey from the dashboard to get started.
+          </p>
+          <Button variant="outline" onClick={() => router.push("/dashboard")}>
+            Go to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state while fetching journey
+  if (isLoading && !activeJourney) {
+    return (
+      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
@@ -74,7 +115,10 @@ function CanvasContent() {
           </div>
 
           {/* Bottom action bar */}
-          <ActionBar onBoomerang={handleBoomerang} />
+          <ActionBar
+            onBoomerang={handleBoomerang}
+            onBank={() => setBankDialogOpen(true)}
+          />
         </div>
       </div>
 
@@ -82,6 +126,13 @@ function CanvasContent() {
       <BoomerangPanel
         open={boomerangOpen}
         onOpenChange={setBoomerangOpen}
+        perspectiveId={currentPerspectiveId}
+      />
+
+      {/* Bank dialog */}
+      <BankDialog
+        open={bankDialogOpen}
+        onOpenChange={setBankDialogOpen}
         perspectiveId={currentPerspectiveId}
       />
     </div>

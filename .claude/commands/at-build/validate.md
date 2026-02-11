@@ -1,19 +1,44 @@
-# PRP PRD Validate
+# AT Build Validate
 
-Autonomous PRD validation loop. Iterates through a PRD document checking against 19 categories of completeness criteria. Fixes issues found, re-validates, and loops until the PRD is 100% complete.
+Autonomous PRD validation loop. Iterates through a PRD document (or doc-core package) checking against 19 categories of completeness criteria. Fixes issues found, re-validates, and loops until the document(s) are 100% complete.
 
 ## Usage
 
 ```
-/prp-prd-validate <prd-file-path> [--max-iterations 15]
+/at-build:validate <prd-file-path | package-directory-path> [--max-iterations 15]
 ```
 
 ## Arguments
 
-- `prd-file-path`: Path to the PRD markdown file to validate
+- `prd-file-path`: Path to a PRD markdown file to validate, OR path to a doc-core package directory
 - `--max-iterations`: Maximum validation iterations (default: 15)
 
 ## Phase 0: SETUP
+
+### 0.1 Detect Input Type
+
+| Input Pattern | Type | Action |
+|---------------|------|--------|
+| Directory path containing a README.md | Doc-core package | Map categories to package documents |
+| File ending `.prd.md` | PRP PRD file | Existing behavior (single file) |
+| Other | Invalid | Stop with usage message |
+
+**If invalid input:**
+```
+PRD Validate requires a PRP PRD file or doc-core package directory.
+
+Usage:
+  /at-build:validate path/to/feature.prd.md                    # Single PRD file
+  /at-build:validate .claude/docs/packages/project/slug/       # Doc-core package
+
+Create one first:
+  /prp-from-prd "your product idea"                            # Creates PRD
+  /at-doc:generate path/to/brief.md                               # Creates doc-core package
+```
+
+### 0.2 Setup — PRD Mode (existing behavior)
+
+**Applies when:** Input is a `.prd.md` file.
 
 1. **Parse arguments** from `$ARGUMENTS`:
    - Extract PRD file path (the source/original PRD)
@@ -53,12 +78,13 @@ Autonomous PRD validation loop. Iterates through a PRD document checking against
       - "Working copy: `.claude/PRPs/prds/{project}/{prd-name}-v{N}.prd.md`"
       - "Previous versions: {list any existing versions}"
 
-4. **Create state file** at `.claude/prp-prd-validate.state.md`:
+4. **Create state file** at `.claude/at-build-validate.state.md`:
 
 ```markdown
 ---
 iteration: 1
 max_iterations: 15
+input_type: "prd"
 source_prd_path: "<original-file-path>"
 working_prd_path: ".claude/PRPs/prds/{project}/{prd-name}-v{N}.prd.md"
 project: "{project}"
@@ -91,12 +117,117 @@ started_at: "<ISO 8601 timestamp>"
 
 **CRITICAL: From this point forward, ALL reads and edits operate on the working copy path, NEVER the source PRD.**
 
+### 0.3 Setup — Package Mode
+
+**Applies when:** Input is a directory containing a README.md (doc-core package).
+
+1. **Parse arguments** from `$ARGUMENTS`:
+   - Extract package directory path
+   - Extract max iterations (default 15)
+
+2. **Validate package exists**:
+   - Read `{package-path}/README.md` for project info
+   - Read ALL documents in the package directory
+   - If README.md doesn't exist, inform user this is not a valid doc-core package and stop
+
+3. **DO NOT create a versioned copy** — validate the package in-place (doc-core packages are already versioned by their slug)
+
+4. **Set working mode**:
+   - `working_mode: "package"`
+   - Note: In package mode, fixes edit the appropriate document file directly (e.g., `03-data-model.md`, `04-api-specification.md`)
+
+5. **Create state file** at `.claude/at-build-validate.state.md`:
+
+```markdown
+---
+iteration: 1
+max_iterations: 15
+input_type: "package"
+package_path: "{package-path}"
+started_at: "<ISO 8601 timestamp>"
+---
+
+# PRD Validation Loop State (Package Mode)
+
+## Package
+- Path: `{package-path}`
+- Documents: {list all .md files found in the package}
+
+## Discovered Patterns
+(Persist any reusable patterns/context across iterations)
+
+## Category Applicability
+(After first scan, note which categories apply to this package)
+
+## Progress Log
+(Append after each iteration)
+```
+
+6. **Determine applicable categories**:
+   - Read `01-prd.md` and other documents to understand scope
+   - Category 13 (AI/Conversation Flows): Only if the project involves AI agents
+   - All other categories: Always apply
+   - Record applicability in state file
+
+7. **Inform the user**:
+   - "Doc-core package: `{package-path}`"
+   - "Mode: Package validation (in-place)"
+   - "Documents found: {list}"
+
+**CRITICAL: In package mode, reads and edits operate on the individual document files within the package directory.**
+
 ## Phase 1: VALIDATE
 
 Run ALL applicable checks from the checklist below. For each check:
-- Read the relevant section(s) of the PRD
+- Read the relevant section(s) of the PRD (or the mapped doc-core document in package mode)
 - Evaluate the PASS condition
 - Record result as PASS or FAIL with specific details
+
+### Doc-Core Document Mapping (Package Mode Only)
+
+When validating a doc-core package, each category reads from its mapped document(s) instead of from a single PRD file. Use this mapping to locate content for each category:
+
+| Category | PRD Mode (single file) | Package Mode (doc-core documents) |
+|----------|----------------------|----------------------------------|
+| 1. Structure & Completeness | PRD file | `01-prd.md` |
+| 2. Database & ORM | PRD file | `03-data-model.md` |
+| 3. API Specification | PRD file | `04-api-specification.md` |
+| 4. Auth & Authorization | PRD file | `10-security-assessment.md` + `04-api-specification.md` |
+| 5. UI/UX & Wireframes | PRD file | `07-ux-specification.md` + `05-user-flows.md` |
+| 6. Business Logic & Rules | PRD file | `01-prd.md` + `06-sequence-diagrams.md` |
+| 7. Cross-Reference Consistency | PRD file | ALL documents (cross-cutting) |
+| 8. External Integrations | PRD file | `02-system-architecture.md` + `04-api-specification.md` |
+| 9. Logging & Observability | PRD file | `09-deployment-architecture.md` |
+| 10. Notifications & Communication | PRD file | `01-prd.md` + `06-sequence-diagrams.md` |
+| 11. Testing & Validation | PRD file | `08-test-strategy.md` |
+| 12. Performance & Accessibility | PRD file | `01-prd.md` + `07-ux-specification.md` |
+| 13. AI/Conversation Flows | PRD file | `01-prd.md` (conditional) |
+| 14. Project Scaffolding & Config | PRD file | `02-system-architecture.md` + `09-deployment-architecture.md` |
+| 15. E2E User Journeys | PRD file | `05-user-flows.md` |
+| 16. Concurrency & Data Integrity | PRD file | `03-data-model.md` + `02-system-architecture.md` |
+| 17. Deployment & Infrastructure | PRD file | `09-deployment-architecture.md` |
+| 18. Worked Examples & Gotchas | PRD file | Cross-cutting (all docs with formulas/examples) |
+| 19. Business Features & Summary | PRD file | `business/` subfolder (if exists) or `01-prd.md` |
+
+**In package mode:** For each category, read ALL mapped documents before evaluating checks. Cross-reference between documents where the mapping shows multiple sources.
+
+### Check Criteria Adaptations (Package Mode)
+
+Some checks have adapted PASS conditions in package mode because doc-core documents use different formats than a single PRP PRD:
+
+| Check | PRD Mode Condition | Package Mode Condition |
+|-------|-------------------|----------------------|
+| 2.1 | "CREATE TABLE statements" | "Entity definition tables with Type, Constraints, Description columns in `03-data-model.md`" |
+| 2.3 | "FK has REFERENCES clause" | "ERD shows cardinality, Relationships section lists FK columns in `03-data-model.md`" |
+| 2.7 | "INSERT statements for seed data" | "Seed Data section in `03-data-model.md` defines initial data requirements" |
+| 3.1 | "buttons in wireframes map to endpoints" | "User actions in `05-user-flows.md` Step-by-Step tables have API Call column matching endpoints in `04-api-specification.md`" |
+| 5.1 | "ASCII art wireframes" | "Layout descriptions in `07-ux-specification.md` screen specifications" |
+| 5.2 | "elements map to DB fields" | "Screen interactive elements tables in `07-ux-specification.md`" |
+| 6.2 | "rules have Python/TypeScript code" | "Rules have precise logic descriptions or formulas (doc-core is pre-implementation)" |
+| 14.1 | "folder structure defined" | "Tech stack table in `02-system-architecture.md` + deployment topology in `09-deployment-architecture.md`" |
+| 19.1-19.6 | Business Features checks | Check `business/` subfolder if exists; if not, check `01-prd.md` Section 4 features |
+
+**In package mode:** Use the adapted conditions above instead of the original PASS conditions for these checks. All other checks use their original PASS conditions but read from the mapped documents.
 
 ### Category 1: Structure & Completeness
 
@@ -340,20 +471,35 @@ After running all checks, generate a validation report:
 
 For each FAILING check:
 
-1. **Determine if fixable** - Can you add the missing content based on context in the PRD?
+1. **Determine if fixable** - Can you add the missing content based on context in the PRD/package?
    - If the fix requires domain knowledge you don't have → Mark as "NEEDS_INPUT" and describe what question to ask
-   - If the fix can be derived from existing PRD content → Fix it
+   - If the fix can be derived from existing content → Fix it
 
-2. **Apply fixes** - Edit the working copy (NEVER the source):
+2. **Apply fixes**:
+
+   **PRD Mode** — Edit the working copy (NEVER the source):
    - All edits go to the versioned working copy at `.claude/PRPs/prds/{project}/{prd-name}-v{N}.prd.md`
    - Add missing sections/content
    - Fill in gaps based on patterns already in the document
    - Ensure fixes are consistent with existing content
    - Don't remove existing content unless it contradicts other sections
 
-3. **Preserve structure** - Maintain the PRD's existing formatting, heading hierarchy, and style
+   **Package Mode** — Edit the appropriate document file within the package:
+   - Missing DB indexes → edit `{package-path}/03-data-model.md`
+   - Missing API error responses → edit `{package-path}/04-api-specification.md`
+   - Missing screen states → edit `{package-path}/07-ux-specification.md`
+   - Missing auth flow details → edit `{package-path}/10-security-assessment.md`
+   - Missing test criteria → edit `{package-path}/08-test-strategy.md`
+   - Missing deployment details → edit `{package-path}/09-deployment-architecture.md`
+   - Missing architecture decisions → edit `{package-path}/02-system-architecture.md`
+   - Missing user journey details → edit `{package-path}/05-user-flows.md`
+   - Missing sequence details → edit `{package-path}/06-sequence-diagrams.md`
+   - Missing business features → edit `{package-path}/business/` files or `{package-path}/01-prd.md`
+   - Cross-reference issues → edit whichever document has the gap
 
-4. **Log fixes** - Record what was fixed in the validation report
+3. **Preserve structure** - Maintain the document's existing formatting, heading hierarchy, and style
+
+4. **Log fixes** - Record what was fixed in the validation report (include which file was edited in package mode)
 
 ## Phase 4: RE-VALIDATE
 
@@ -365,6 +511,8 @@ After applying fixes:
 ## Phase 5: COMPLETION CHECK
 
 ### If ALL applicable checks PASS:
+
+**PRD Mode:**
 1. Write final validation report to `.claude/PRPs/reports/{project}/prd-validation-{prd-name}-v{N}-report.md`
 2. Update state file progress log with final summary
 3. Inform user of output artifacts:
@@ -372,6 +520,16 @@ After applying fixes:
    - "Validated PRD (v{N}): `.claude/PRPs/prds/{project}/{prd-name}-v{N}.prd.md`"
    - "Validation report: `.claude/PRPs/reports/{project}/prd-validation-{prd-name}-v{N}-report.md`"
 4. Output: `<promise>PRD_COMPLETE</promise>`
+
+**Package Mode:**
+1. Write validation report to `{package-path}/prp-validation-report.md`
+2. Update state file progress log with final summary
+3. Inform user of output artifacts:
+   - "Package validated: `{package-path}`"
+   - "Validation report: `{package-path}/prp-validation-report.md`"
+   - "Documents modified: {list of files edited during validation}"
+4. No versioned copy cleanup needed (working on package in-place)
+5. Output: `<promise>PRD_COMPLETE</promise>`
 
 ### If checks are still FAILING:
 1. Update state file progress log with:

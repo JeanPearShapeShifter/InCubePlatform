@@ -1,9 +1,9 @@
 ---
-description: Start autonomous Ralph loop to execute PRP plan until all validations pass
-argument-hint: <plan.md|prd.md> [--max-iterations N]
+description: Start autonomous Ralph loop to execute plan until all validations pass
+argument-hint: <plan.md|prd.md|package-dir> [--max-iterations N]
 ---
 
-# PRP Ralph Loop
+# AT Build Ralph Loop
 
 **Input**: $ARGUMENTS
 
@@ -24,7 +24,7 @@ Start an autonomous Ralph loop that executes a PRP plan iteratively until all va
 ### 1.1 Parse Arguments
 
 Extract from input:
-- **File path**: Must end in `.plan.md` or `.prd.md`
+- **File path or directory**: Must end in `.plan.md`, `.prd.md`, or be a directory with `README.md`
 - **Max iterations**: `--max-iterations N` (default: 20)
 
 ### 1.2 Validate Input Type
@@ -33,25 +33,31 @@ Extract from input:
 |-------|--------|
 | Ends with `.plan.md` | Valid - use as plan file |
 | Ends with `.prd.md` | Valid - will select next phase |
+| Directory with `README.md` | Valid - doc-core package, load all docs |
 | Free-form text | STOP with message below |
 | No input | STOP with message below |
 
 **If invalid input:**
 ```
-Ralph requires a PRP plan or PRD file.
+Ralph requires a PRP plan, PRD file, or doc-core package.
 
 Create one first:
-  /prp-plan "your feature description"   # Creates plan from description
-  /prp-prd "your product idea"           # Creates PRD with phases
+  /at-build:plan "your feature description"     # Creates plan from description
+  /prp-prd "your product idea"             # Creates PRD with phases
+  /at-doc:generate path/to/brief.md           # Creates doc-core package
 
 Then run:
-  /prp-ralph .claude/PRPs/plans/your-feature.plan.md --max-iterations 20
+  /at-build:ralph .claude/PRPs/plans/your-feature.plan.md
+  /at-build:ralph .claude/docs/packages/project/slug/      # From doc-core package
 ```
 
-### 1.3 Verify File Exists
+### 1.3 Verify File/Directory Exists
 
 ```bash
+# For file inputs
 test -f "{file_path}" && echo "EXISTS" || echo "NOT_FOUND"
+# For directory inputs (doc-core package)
+test -f "{dir_path}/README.md" && echo "PACKAGE_FOUND" || echo "NOT_FOUND"
 ```
 
 **If NOT_FOUND**: Stop with error message.
@@ -65,10 +71,20 @@ If input is a `.prd.md` file:
 4. Report which phase will be executed
 5. Note: The loop will create and execute a plan for this phase
 
+### 1.5 If Doc-Core Package - Load Package Context
+
+If input is a directory with `README.md`:
+1. Read ALL documents from the package directory
+2. Read `01-prd.md` to find implementation phases (from Feature Priority Matrix or Phase table if present)
+3. If no explicit phases: treat the entire PRD scope as a single implementation phase
+4. Generate an internal plan using `/at-build:plan` logic with all docs as context (or create one inline)
+5. Report the package contents and scope to the user
+
 **PHASE_1_CHECKPOINT:**
-- [ ] Input parsed (file path + max iterations)
-- [ ] File exists and is valid type
+- [ ] Input parsed (file/directory path + max iterations)
+- [ ] File/directory exists and is valid type
 - [ ] If PRD: next phase identified
+- [ ] If package: all documents read, scope determined
 
 ---
 
@@ -76,7 +92,7 @@ If input is a `.prd.md` file:
 
 ### 2.1 Create State File
 
-Create `.claude/prp-ralph.state.md`:
+Create `.claude/at-build-ralph.state.md`:
 
 ```bash
 mkdir -p .claude
@@ -85,6 +101,7 @@ mkdir -p .claude/PRPs/ralph-archives
 
 Write state file with this structure:
 
+**For plan/PRD input:**
 ```markdown
 ---
 iteration: 1
@@ -119,6 +136,49 @@ Execute PRP plan and iterate until all validations pass.
 ---
 ```
 
+**For doc-core package input:**
+```markdown
+---
+iteration: 1
+max_iterations: {N}
+plan_path: "{generated-plan-path-or-inline}"
+input_type: "package"
+package_path: "{package-path}"
+started_at: "{ISO timestamp}"
+---
+
+# PRP Ralph Loop State (Package Mode)
+
+## Codebase Patterns
+(Consolidate reusable patterns here - future iterations read this first)
+
+## Current Task
+Implement from doc-core package and iterate until all validations pass.
+
+## Package Reference
+{package-path}
+
+## Instructions
+1. Read ALL documents in the package for context
+2. Use 01-prd.md for requirements and acceptance criteria
+3. Use 02-system-architecture.md for technology stack and patterns
+4. Use 03-data-model.md for database schema
+5. Use 04-api-specification.md for endpoint contracts
+6. Use 05-user-flows.md for user journey validation
+7. Use 07-ux-specification.md for UI component specs
+8. Use 08-test-strategy.md for test requirements
+9. Use 09-deployment-architecture.md for infrastructure
+10. Use 10-security-assessment.md for security requirements
+11. Implement all incomplete tasks
+12. Run ALL validation commands
+13. When ALL validations pass: output <promise>COMPLETE</promise>
+
+## Progress Log
+(Append learnings after each iteration)
+
+---
+```
+
 ### 2.2 Display Startup Message
 
 ```markdown
@@ -132,8 +192,8 @@ The stop hook is now active. When you try to exit:
 - If validations incomplete → same prompt fed back
 - If all validations pass → loop exits
 
-To monitor: `cat .claude/prp-ralph.state.md`
-To cancel: `/prp-ralph-cancel`
+To monitor: `cat .claude/at-build-ralph.state.md`
+To cancel: `/at-build:ralph-cancel`
 
 ---
 
@@ -158,6 +218,25 @@ Starting iteration 1...
 
 ## Phase 3: EXECUTE - Work on Plan
 
+### 3.0 Load Package Context (Package Mode Only)
+
+Before implementing anything, read ALL package documents for full context:
+- `01-prd.md` → Requirements, features, acceptance criteria
+- `02-system-architecture.md` → Architecture decisions, tech stack, component design
+- `03-data-model.md` → Entity definitions, relationships, indexes, migrations
+- `04-api-specification.md` → Endpoints, request/response schemas, error codes
+- `05-user-flows.md` → User journeys, step-by-step with API calls
+- `06-sequence-diagrams.md` → System interactions, async flows
+- `07-ux-specification.md` → Screen specs, state machines, design tokens, responsive
+- `08-test-strategy.md` → Test pyramid, CI/CD, quality gates
+- `09-deployment-architecture.md` → Infrastructure, environments, monitoring
+- `10-security-assessment.md` → Auth, OWASP, encryption, API security
+
+Also read if they exist:
+- `review-report.md` → Known issues, cross-document inconsistencies
+- `business/` subfolder → Business context for user-facing features
+- `strategy/` subfolder → Market context, positioning, MVP scope
+
 ### 3.1 Read Context First
 
 Before implementing anything:
@@ -180,6 +259,14 @@ For each incomplete task:
 2. Read any MIRROR/pattern references
 3. Implement the change
 4. Run task-specific validation if specified
+
+**Package mode guidance** — Reference specific documents when implementing each component:
+- Writing database models/migrations → follow `03-data-model.md` entity definitions and relationships
+- Writing API routes → follow `04-api-specification.md` endpoint contracts and error codes
+- Writing frontend components → follow `07-ux-specification.md` screen specifications
+- Writing tests → follow `08-test-strategy.md` test pyramid and quality gates
+- Writing auth logic → follow `10-security-assessment.md` security requirements
+- Writing infrastructure → follow `09-deployment-architecture.md` deployment topology
 
 ### 3.4 Validate
 
@@ -332,7 +419,7 @@ ALL of these must be true:
    mkdir -p "$ARCHIVE_DIR"
 
    # Copy state file (with all learnings)
-   cp .claude/prp-ralph.state.md "$ARCHIVE_DIR/state.md"
+   cp .claude/at-build-ralph.state.md "$ARCHIVE_DIR/state.md"
 
    # Copy the plan
    cp {plan_path} "$ARCHIVE_DIR/plan.md"
@@ -366,7 +453,7 @@ ALL of these must be true:
 5. **Clean Up State**
 
    ```bash
-   rm .claude/prp-ralph.state.md
+   rm .claude/at-build-ralph.state.md
    ```
 
 6. **Output Completion Promise**
