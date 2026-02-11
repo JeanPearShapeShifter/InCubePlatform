@@ -22,8 +22,17 @@ router = APIRouter(prefix="/auth")
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
-async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(data: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db)):
     user, _org = await auth_service.register(db, data)
+    token = create_access_token(str(user.id), str(user.organization_id), user.role)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7,  # 7 days
+    )
     return UserResponse.model_validate(user)
 
 
