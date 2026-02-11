@@ -14,6 +14,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.journeys import router as journeys_router
 from app.api.routes.organizations import router as organizations_router
 from app.api.routes.perspectives import router as perspectives_router
+from app.api.routes.settings import router as settings_router
 from app.api.routes.vibes import router as vibes_router
 from app.core.config import settings
 from app.core.errors import AppError
@@ -65,3 +66,4 @@ app.include_router(bank_router, prefix="/api")
 app.include_router(agents_router, prefix="/api")
 app.include_router(emails_router, prefix="/api")
 app.include_router(vibes_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
