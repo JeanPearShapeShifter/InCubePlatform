@@ -1,6 +1,6 @@
 import pytest
 
-from app.core.errors import ValidationError
+from app.core.errors import UnauthorizedError, ValidationError
 from app.core.security import (
     create_access_token,
     decode_token,
@@ -50,7 +50,7 @@ class TestJWT:
         assert "refresh_exp" in payload
 
     def test_invalid_token_raises(self):
-        with pytest.raises(ValidationError, match="Invalid or expired"):
+        with pytest.raises(UnauthorizedError, match="Invalid or expired"):
             decode_token("garbage.token.here")
 
 
@@ -85,7 +85,7 @@ class TestAuthEndpoints:
     @pytest.mark.skipif(True, reason="Requires database connection")
     async def test_me_unauthenticated(self, client):
         resp = await client.get("/api/auth/me")
-        assert resp.status_code == 400
+        assert resp.status_code == 401
 
     @pytest.mark.skipif(True, reason="Requires database connection")
     async def test_invalid_login(self, client):
