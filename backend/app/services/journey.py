@@ -76,6 +76,15 @@ async def get_journey(db: AsyncSession, org_id: uuid.UUID, journey_id: uuid.UUID
     return {"journey": journey, "perspectives": perspectives, "bank_instances": bank_instances}
 
 
+async def delete_journey(db: AsyncSession, org_id: uuid.UUID, journey_id: uuid.UUID) -> None:
+    result = await db.execute(select(Journey).where(Journey.id == journey_id, Journey.organization_id == org_id))
+    journey = result.scalar_one_or_none()
+    if not journey:
+        raise NotFoundError("Journey not found")
+    await db.delete(journey)
+    await db.flush()
+
+
 async def update_journey_status(
     db: AsyncSession, org_id: uuid.UUID, journey_id: uuid.UUID, new_status: str
 ) -> Journey:
