@@ -43,6 +43,13 @@ def _validate_setting_value(key: str, value: Any) -> None:
             raise ValidationError("Alert thresholds must be integers between 0 and 100")
 
 
+def _mask_api_key(key: str) -> str:
+    """Return masked version of API key, showing only last 4 characters."""
+    if not key or len(key) < 8:
+        return ""
+    return "sk-......" + key[-4:]
+
+
 async def get_settings(db: AsyncSession, org_id: uuid.UUID) -> SettingsResponse:
     result = await db.execute(select(Setting).where(Setting.organization_id == org_id))
     rows = result.scalars().all()
@@ -54,7 +61,22 @@ async def get_settings(db: AsyncSession, org_id: uuid.UUID) -> SettingsResponse:
         if row.key in settings_dict and "value" in row.value:
             settings_dict[row.key] = row.value["value"]
 
+    # Mask the API key for display
+    if settings_dict.get("anthropic_api_key"):
+        settings_dict["anthropic_api_key"] = _mask_api_key(settings_dict["anthropic_api_key"])
+
     return SettingsResponse(**settings_dict)
+
+
+async def get_raw_api_key(db: AsyncSession, org_id: uuid.UUID) -> str | None:
+    """Get the unmasked Anthropic API key for an organization (for agent use)."""
+    result = await db.execute(
+        select(Setting).where(Setting.organization_id == org_id, Setting.key == "anthropic_api_key")
+    )
+    setting = result.scalar_one_or_none()
+    if setting and "value" in setting.value:
+        return setting.value["value"] or None
+    return None
 
 
 async def update_setting(db: AsyncSession, org_id: uuid.UUID, key: str, value: Any) -> Setting:

@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 ALLOWED_SETTINGS = {
     "default_model": str,
+    "anthropic_api_key": str,
     "voice_provider": str,
     "voice_language": str,
     "theme": str,
@@ -25,6 +26,7 @@ class SettingUpdate(BaseModel):
 
 class SettingsResponse(BaseModel):
     default_model: str = "claude-haiku-4-5-20251001"
+    anthropic_api_key: str = ""
     voice_provider: str = "whisper"
     voice_language: str = "en"
     theme: str = "space"

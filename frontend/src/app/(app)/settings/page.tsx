@@ -13,6 +13,7 @@ import { apiGet, apiPut } from "@/lib/api";
 
 interface OrgSettings {
   default_model: string;
+  anthropic_api_key: string;
   voice_provider: string;
   voice_language: string;
   theme: string;
@@ -23,6 +24,7 @@ interface OrgSettings {
 
 const DEFAULT_SETTINGS: OrgSettings = {
   default_model: "claude-haiku-4-5-20251001",
+  anthropic_api_key: "",
   voice_provider: "whisper",
   voice_language: "en",
   theme: "space",

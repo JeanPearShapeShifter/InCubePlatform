@@ -60,6 +60,8 @@ async def agent_chat(
         perspective_id=perspective.id,
         dimension=perspective.dimension,
         phase=perspective.phase,
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
     )
 
     async def stream() -> AsyncGenerator[str, None]:
@@ -96,16 +98,32 @@ async def run_boomerang(
         dimension=perspective.dimension,
         phase=perspective.phase,
         goal_statement=goal_statement,
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
     )
 
     # Build user message from goal context — never send empty
     user_prompt = body.prompt.strip() if body.prompt else ""
     if user_prompt:
-        message = f"## Goal\n{goal_statement}\n\n## Additional Context\n{user_prompt}" if goal_statement else user_prompt
+        message = (
+            f"## Goal\n{goal_statement}\n\n## Additional Context\n{user_prompt}"
+            if goal_statement
+            else user_prompt
+        )
     elif goal_statement:
-        message = f"## Goal\n{goal_statement}\n\nAnalyze this goal from your specialist perspective within the {perspective.dimension} / {perspective.phase} intersection."
+        dim, phase = perspective.dimension, perspective.phase
+        message = (
+            f"## Goal\n{goal_statement}\n\n"
+            f"Analyze this goal from your specialist perspective "
+            f"within the {dim} / {phase} intersection."
+        )
     else:
-        message = f"Analyze the current business transformation context from your specialist perspective within the {perspective.dimension} / {perspective.phase} intersection."
+        dim, phase = perspective.dimension, perspective.phase
+        message = (
+            f"Analyze the current business transformation context "
+            f"from your specialist perspective "
+            f"within the {dim} / {phase} intersection."
+        )
 
     orchestrator = BoomerangOrchestrator()
 
@@ -176,6 +194,8 @@ async def trigger_axiom_challenge(
         perspective_id=perspective.id,
         dimension=perspective.dimension,
         phase=perspective.phase,
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
     )
 
     # Gather latest specialist outputs from stored sessions

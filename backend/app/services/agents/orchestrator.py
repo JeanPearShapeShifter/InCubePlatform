@@ -8,9 +8,15 @@ from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings as app_settings
 from app.core.sse import sse_event
 from app.services.agents.axiom import AxiomChallenger
-from app.services.agents.base import AGENT_REGISTRY, AgentContext, BaseAgent
+from app.services.agents.base import (
+    AGENT_REGISTRY,
+    AgentContext,
+    BaseAgent,
+    record_api_usage,
+)
 from app.services.agents.prompts import VALID_AGENT_NAMES, build_system_prompt
 
 logger = logging.getLogger(__name__)
@@ -36,10 +42,10 @@ class BoomerangOrchestrator:
         # Phase 1: Run 8 specialist agents in parallel
         specialist_outputs: dict[str, str] = {}
 
-        async def run_specialist(agent: BaseAgent) -> tuple[str, str]:
+        async def run_specialist(agent: BaseAgent) -> tuple[str, str, int, int]:
             system = build_system_prompt(agent.name, context.dimension, context.phase)
-            content, _in_tok, _out_tok = await agent.raw_chat(prompt, system)
-            return agent.name, content
+            content, in_tok, out_tok = await agent.raw_chat(prompt, system)
+            return agent.name, content, in_tok, out_tok
 
         # Notify start of each agent
         for name in SPECIALIST_AGENTS:
@@ -52,8 +58,15 @@ class BoomerangOrchestrator:
             if isinstance(result, Exception):
                 logger.error("Specialist agent failed: %s", result)
                 continue
-            name, content = result
+            name, content, in_tok, out_tok = result
             specialist_outputs[name] = content
+
+            # Record API usage for this specialist call
+            await record_api_usage(
+                db, context, name, app_settings.default_agent_model,
+                in_tok, out_tok, endpoint=f"boomerang/specialist/{name}",
+            )
+
             yield sse_event("agent_complete", {
                 "agent": name,
                 "content": content,
