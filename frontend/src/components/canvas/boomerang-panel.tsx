@@ -62,7 +62,7 @@ export function BoomerangPanel({
         onEvent: (event) => {
           try {
             const data = JSON.parse(event.data);
-            const agentName = data.agent_name as AgentName;
+            const agentName = (data.agent ?? data.agent_name) as AgentName;
 
             switch (event.event) {
               case "agent_start":
