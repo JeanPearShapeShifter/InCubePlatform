@@ -14,6 +14,8 @@ from app.core.errors import NotFoundError, ValidationError
 from app.core.sse import sse_event, sse_response
 from app.models.agent_session import AgentSession
 from app.models.axiom_challenge import AxiomChallenge
+from app.models.goal import Goal
+from app.models.journey import Journey
 from app.models.perspective import Perspective
 from app.models.user import User
 from app.schemas.agent import (
@@ -77,16 +79,38 @@ async def run_boomerang(
     """Run the full boomerang flow (8 specialists + Axiom) via SSE."""
     perspective = await _get_perspective(perspective_id, db)
 
+    # Load goal via perspective -> journey -> goal
+    journey_result = await db.execute(select(Journey).where(Journey.id == perspective.journey_id))
+    journey = journey_result.scalar_one_or_none()
+    goal_statement = ""
+    if journey:
+        goal_result = await db.execute(select(Goal).where(Goal.id == journey.goal_id))
+        goal = goal_result.scalar_one_or_none()
+        if goal:
+            goal_statement = goal.title
+            if goal.description:
+                goal_statement += f"\n\n{goal.description}"
+
     context = AgentContext(
         perspective_id=perspective.id,
         dimension=perspective.dimension,
         phase=perspective.phase,
+        goal_statement=goal_statement,
     )
+
+    # Build user message from goal context — never send empty
+    user_prompt = body.prompt.strip() if body.prompt else ""
+    if user_prompt:
+        message = f"## Goal\n{goal_statement}\n\n## Additional Context\n{user_prompt}" if goal_statement else user_prompt
+    elif goal_statement:
+        message = f"## Goal\n{goal_statement}\n\nAnalyze this goal from your specialist perspective within the {perspective.dimension} / {perspective.phase} intersection."
+    else:
+        message = f"Analyze the current business transformation context from your specialist perspective within the {perspective.dimension} / {perspective.phase} intersection."
 
     orchestrator = BoomerangOrchestrator()
 
     async def stream() -> AsyncGenerator[str, None]:
-        async for event in orchestrator.run(context, body.prompt, db):
+        async for event in orchestrator.run(context, message, db):
             yield event
 
     return sse_response(stream())
