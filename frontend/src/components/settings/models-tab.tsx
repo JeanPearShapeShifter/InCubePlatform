@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -9,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import type { AgentName } from "@/types";
 
 const MODELS = [
@@ -31,13 +35,74 @@ const AGENTS: { name: AgentName; label: string; role: string }[] = [
 interface ModelsTabProps {
   settings: {
     default_model: string;
+    anthropic_api_key?: string;
   };
   onUpdate: (key: string, value: string) => void;
 }
 
 export function ModelsTab({ settings, onUpdate }: ModelsTabProps) {
+  const [apiKey, setApiKey] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const isConfigured = !!settings.anthropic_api_key;
+
+  async function handleSaveKey() {
+    if (!apiKey.trim()) return;
+    setSaving(true);
+    setSaved(false);
+    try {
+      onUpdate("anthropic_api_key", apiKey.trim());
+      setApiKey("");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Anthropic API Key</CardTitle>
+          <CardDescription>
+            Your Anthropic API key is used for all AI agent calls. Keep this secret.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Label className="shrink-0">Status:</Label>
+              {isConfigured ? (
+                <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
+                  Configured ({settings.anthropic_api_key})
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+                  Not configured
+                </Badge>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                placeholder="sk-ant-api03-..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="flex-1"
+              />
+              <Button onClick={handleSaveKey} disabled={!apiKey.trim() || saving}>
+                {saving ? "Saving..." : saved ? "Saved" : "Save Key"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enter a new key to update. The key is stored securely and only the last 4 characters are displayed.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Default Model</CardTitle>

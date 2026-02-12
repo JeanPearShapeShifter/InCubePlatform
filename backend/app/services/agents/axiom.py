@@ -14,7 +14,13 @@ from app.core.config import settings
 from app.core.sse import sse_event
 from app.models.agent_session import AgentSession
 from app.models.axiom_challenge import AxiomChallenge
-from app.services.agents.base import COST_PER_INPUT_TOKEN, COST_PER_OUTPUT_TOKEN, AgentContext, BaseAgent
+from app.services.agents.base import (
+    COST_PER_INPUT_TOKEN,
+    COST_PER_OUTPUT_TOKEN,
+    AgentContext,
+    BaseAgent,
+    record_api_usage,
+)
 from app.services.agents.prompts import (
     build_axiom_challenge_prompt,
     build_axiom_verdict_prompt,
@@ -81,6 +87,12 @@ class AxiomChallenger:
         db.add(session)
         await db.flush()
 
+        # Record API usage
+        await record_api_usage(
+            db, context, "axiom", settings.default_agent_model,
+            input_tokens, output_tokens, endpoint="boomerang/axiom/challenge",
+        )
+
         # Parse challenges from JSON response
         challenges = _parse_challenges(content)
 
@@ -137,6 +149,12 @@ class AxiomChallenger:
         db.add(session)
         await db.flush()
 
+        # Record API usage
+        await record_api_usage(
+            db, context, agent.name, settings.default_agent_model,
+            input_tokens, output_tokens, endpoint=f"boomerang/challenge_response/{agent.name}",
+        )
+
         return content, session.id
 
     async def evaluate(
@@ -172,6 +190,12 @@ class AxiomChallenger:
         )
         db.add(session)
         await db.flush()
+
+        # Record API usage
+        await record_api_usage(
+            db, context, "axiom", settings.default_agent_model,
+            input_tokens, output_tokens, endpoint="boomerang/axiom/verdict",
+        )
 
         return _parse_verdict(content)
 

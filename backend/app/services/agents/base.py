@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.sse import sse_event
 from app.models.agent_session import AgentSession
+from app.models.api_usage import ApiUsage
 from app.services.agents.prompts import AGENT_DEFINITIONS, build_system_prompt
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,37 @@ class AgentContext:
     dimension: str | None = None
     phase: str | None = None
     goal_statement: str | None = None
+    organization_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+
+
+async def record_api_usage(
+    db: AsyncSession,
+    context: AgentContext,
+    agent_name: str,
+    model: str,
+    tokens_in: int,
+    tokens_out: int,
+    endpoint: str,
+) -> None:
+    """Insert an ApiUsage record for billing/usage tracking."""
+    if not context.organization_id or not context.user_id:
+        return
+    cost_cents = (
+        tokens_in * COST_PER_INPUT_TOKEN + tokens_out * COST_PER_OUTPUT_TOKEN
+    ) * 100
+    usage = ApiUsage(
+        organization_id=context.organization_id,
+        user_id=context.user_id,
+        service="claude",
+        model_name=model,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        cost_cents=round(cost_cents, 4),
+        endpoint=endpoint,
+    )
+    db.add(usage)
+    await db.flush()
 
 
 class BaseAgent:
@@ -99,6 +131,12 @@ class BaseAgent:
         )
         db.add(session)
         await db.flush()
+
+        # Record API usage for billing tracking
+        await record_api_usage(
+            db, context, self.name, model, input_tokens, output_tokens,
+            endpoint=f"chat/{self.name}",
+        )
 
         yield sse_event("done", {
             "agent": self.name,
