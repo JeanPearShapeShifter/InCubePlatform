@@ -85,12 +85,43 @@ export function BoomerangPanel({
                 });
                 break;
               case "agent_error":
-                setAgentOutput(agentName, {
+                setAgentOutput(agentName ?? "axiom", {
                   status: "error",
                   content: data.error ?? "Agent failed",
                 });
                 break;
+              case "axiom_start":
+                setAgentOutput("axiom", { status: "running" });
+                break;
+              case "axiom_challenge":
+                setAgentOutput("axiom", {
+                  status: "running",
+                  content:
+                    (agentOutputs["axiom"]?.content ?? "") +
+                    `**Challenge** (${data.severity ?? "medium"}): ${data.challenge_text ?? ""}\n\n`,
+                });
+                break;
+              case "challenge_response":
+                setAgentOutput("axiom", {
+                  status: "running",
+                  content:
+                    (agentOutputs["axiom"]?.content ?? "") +
+                    `**${data.agent ?? "Agent"} responds**: ${data.response ?? ""}\n\n`,
+                });
+                break;
+              case "axiom_verdict":
+                setAgentOutput("axiom", {
+                  status: "running",
+                  content:
+                    (agentOutputs["axiom"]?.content ?? "") +
+                    `**Verdict** (${data.resolution ?? ""}): ${data.resolution_text ?? ""}\n\n`,
+                });
+                break;
               case "boomerang_complete":
+                // Mark axiom as complete if it was running
+                if (agentOutputs["axiom"]?.status === "running") {
+                  setAgentOutput("axiom", { status: "complete" });
+                }
                 stopBoomerang();
                 if (perspectiveId) {
                   updatePerspectiveStatus(perspectiveId, "completed").then(() => {

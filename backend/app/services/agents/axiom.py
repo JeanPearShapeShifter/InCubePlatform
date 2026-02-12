@@ -210,7 +210,15 @@ class AxiomChallenger:
         Yields SSE events for challenge, responses, and verdicts.
         """
         # Step 1: Axiom produces challenges
-        challenges, _raw = await self.challenge(specialist_outputs, context, db)
+        try:
+            challenges, _raw = await self.challenge(specialist_outputs, context, db)
+        except Exception:
+            logger.exception("Axiom challenge generation failed")
+            yield sse_event("agent_error", {
+                "agent": "axiom",
+                "error": "Failed to generate challenges",
+            })
+            return
 
         for ch in challenges:
             yield sse_event("axiom_challenge", {
@@ -227,9 +235,17 @@ class AxiomChallenger:
             for agent_name in ch.targeted_agents:
                 if agent_name in AGENT_REGISTRY and agent_name != "axiom":
                     agent = AGENT_REGISTRY[agent_name]
-                    response_text, _session_id = await self.get_agent_response(
-                        agent, ch.challenge_text, context, db,
-                    )
+                    try:
+                        response_text, _session_id = await self.get_agent_response(
+                            agent, ch.challenge_text, context, db,
+                        )
+                    except Exception:
+                        logger.exception("Agent %s failed to respond to challenge", agent_name)
+                        yield sse_event("agent_error", {
+                            "agent": agent_name,
+                            "error": f"Failed to respond to challenge: {ch.challenge_text[:100]}",
+                        })
+                        continue
                     responses[agent_name] = response_text
                     yield sse_event("challenge_response", {
                         "agent": agent_name,
@@ -238,7 +254,15 @@ class AxiomChallenger:
                     })
 
             # Step 3: Axiom evaluates
-            verdict = await self.evaluate(ch, responses, context, db)
+            try:
+                verdict = await self.evaluate(ch, responses, context, db)
+            except Exception:
+                logger.exception("Axiom verdict evaluation failed")
+                yield sse_event("agent_error", {
+                    "agent": "axiom",
+                    "error": "Failed to evaluate challenge responses",
+                })
+                continue
             yield sse_event("axiom_verdict", {
                 "challenge_text": ch.challenge_text,
                 "resolution": verdict.resolution,

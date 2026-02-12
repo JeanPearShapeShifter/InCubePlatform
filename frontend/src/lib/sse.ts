@@ -56,6 +56,8 @@ export function connectSSE(url: string, options: SSEOptions): AbortController {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let currentEvent = "";
+      let currentData = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -65,9 +67,6 @@ export function connectSSE(url: string, options: SSEOptions): AbortController {
         const lines = buffer.split("\n");
         // Keep incomplete last line in buffer
         buffer = lines.pop() ?? "";
-
-        let currentEvent = "";
-        let currentData = "";
 
         for (const line of lines) {
           if (line.startsWith("event:")) {

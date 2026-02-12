@@ -77,11 +77,18 @@ class BoomerangOrchestrator:
             return
 
         # Phase 2: Axiom challenge flow
+        logger.info("Specialists complete (%d/%d). Starting Axiom challenge phase.",
+                     len(specialist_outputs), len(SPECIALIST_AGENTS))
         yield sse_event("axiom_start", {"agent": "axiom"})
 
-        async for event in self._challenger.stream_challenge(specialist_outputs, context, db):
-            yield event
+        try:
+            async for event in self._challenger.stream_challenge(specialist_outputs, context, db):
+                yield event
+        except Exception:
+            logger.exception("Axiom challenge phase failed")
+            yield sse_event("agent_error", {"agent": "axiom", "error": "Axiom challenge phase failed"})
 
+        logger.info("Axiom phase complete. Emitting boomerang_complete.")
         yield sse_event("boomerang_complete", {
             "perspective_id": str(context.perspective_id),
             "agents_completed": list(specialist_outputs.keys()),
