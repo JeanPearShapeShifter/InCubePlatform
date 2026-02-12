@@ -148,7 +148,7 @@ async def test_chat_endpoint_requires_auth(agent_client):
         f"/api/perspectives/{fake_id}/agents/invalid_agent/chat",
         json={"message": "test"},
     )
-    assert response.status_code == 400
+    assert response.status_code == 401
     data = response.json()
     assert "authenticated" in data["error"]["message"].lower()
 

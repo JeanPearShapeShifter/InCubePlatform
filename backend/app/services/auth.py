@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import ConflictError, NotFoundError, ValidationError
+from app.core.errors import ConflictError, NotFoundError, UnauthorizedError, ValidationError
 from app.core.security import (
     create_access_token,
     decode_token,
@@ -74,12 +74,12 @@ async def get_current_user(db: AsyncSession, token: str) -> User:
     payload = decode_token(token)
     user_id = payload.get("sub")
     if not user_id:
-        raise ValidationError("Invalid token")
+        raise UnauthorizedError("Invalid token")
 
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
-        raise NotFoundError("User not found")
+        raise UnauthorizedError("User not found")
     return user
 
 
@@ -87,11 +87,11 @@ async def refresh_token(token: str) -> str:
     payload = decode_token(token)
     refresh_exp = payload.get("refresh_exp")
     if not refresh_exp:
-        raise ValidationError("Token is not refreshable")
+        raise UnauthorizedError("Token is not refreshable")
 
     now = datetime.now(UTC)
     if now.timestamp() > refresh_exp:
-        raise ValidationError("Refresh token has expired")
+        raise UnauthorizedError("Refresh token has expired")
 
     return create_access_token(payload["sub"], payload["org"], payload["role"])
 

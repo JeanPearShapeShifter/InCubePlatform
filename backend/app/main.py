@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -21,8 +22,18 @@ from app.api.routes.vdbas import router as vdbas_router
 from app.api.routes.vibes import router as vibes_router
 from app.core.config import settings
 from app.core.errors import AppError
+from app.core.logging_middleware import LoggingMiddleware
 from app.core.middleware import RequestIDMiddleware
 from app.db.session import engine
+
+# Configure request logging
+logging.basicConfig(
+    level=logging.getLevelName(settings.log_level.upper()),
+    format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+# Ensure our request logger is active even if root level is higher
+logging.getLogger("incube.requests").setLevel(logging.getLevelName(settings.log_level.upper()))
 
 
 @asynccontextmanager
@@ -37,8 +48,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="InCube API", version="1.0.0", lifespan=lifespan)
 
-# Middleware
+# Middleware — order matters: last added wraps outermost.
+# RequestIDMiddleware runs first (outermost), then LoggingMiddleware reads the ID.
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(LoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in settings.cors_origins.split(",")],

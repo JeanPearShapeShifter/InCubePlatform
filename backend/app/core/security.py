@@ -7,7 +7,7 @@ import bcrypt
 from jose import JWTError, jwt
 
 from app.core.config import settings
-from app.core.errors import ValidationError
+from app.core.errors import UnauthorizedError, ValidationError
 
 ALGORITHM = "HS256"
 
@@ -29,7 +29,7 @@ def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
     except JWTError as e:
-        raise ValidationError("Invalid or expired token") from e
+        raise UnauthorizedError("Invalid or expired token") from e
 
 
 def hash_password(password: str) -> str:

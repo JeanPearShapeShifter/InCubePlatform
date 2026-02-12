@@ -57,6 +57,8 @@ export function BoomerangPanel({
     const controller = connectSSE(
       `/api/perspectives/${perspectiveId}/boomerang`,
       {
+        method: "POST",
+        body: { prompt: "" },
         onEvent: (event) => {
           try {
             const data = JSON.parse(event.data);

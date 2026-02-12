@@ -10,6 +10,10 @@ export interface SSEOptions {
   onError?: (error: Error) => void;
   onOpen?: () => void;
   onClose?: () => void;
+  /** HTTP method (defaults to GET). */
+  method?: "GET" | "POST";
+  /** JSON body to send with POST requests. */
+  body?: unknown;
 }
 
 /**
@@ -18,14 +22,26 @@ export interface SSEOptions {
  */
 export function connectSSE(url: string, options: SSEOptions): AbortController {
   const controller = new AbortController();
+  const method = options.method ?? "GET";
 
   (async () => {
     try {
-      const response = await fetch(url, {
+      const headers: Record<string, string> = {
+        Accept: "text/event-stream",
+      };
+      const fetchInit: RequestInit = {
+        method,
         credentials: "include",
-        headers: { Accept: "text/event-stream" },
+        headers,
         signal: controller.signal,
-      });
+      };
+
+      if (method === "POST") {
+        headers["Content-Type"] = "application/json";
+        fetchInit.body = JSON.stringify(options.body ?? {});
+      }
+
+      const response = await fetch(url, fetchInit);
 
       if (!response.ok) {
         throw new Error(`SSE connection failed: ${response.status}`);
