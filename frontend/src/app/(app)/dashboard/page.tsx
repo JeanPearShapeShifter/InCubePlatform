@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
 import type { DashboardStats, Goal, Journey } from "@/types";
 import {
@@ -11,10 +12,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { NewJourneyDialog } from "@/components/dashboard/new-journey-dialog";
-import { Rocket, Briefcase, Zap, Globe, DollarSign, FileText } from "lucide-react";
+import { useJourneyStore } from "@/stores/journey-store";
+import { Rocket, Briefcase, Zap, Globe, DollarSign, FileText, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 const statusColors: Record<string, string> = {
@@ -65,6 +68,24 @@ export default function DashboardPage() {
     },
     enabled: goalIds.length > 0,
   });
+
+  const { deleteJourney } = useJourneyStore();
+  const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDelete(e: React.MouseEvent, journeyId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Delete this journey? This cannot be undone.")) return;
+    setDeletingId(journeyId);
+    try {
+      await deleteJourney(journeyId);
+      queryClient.invalidateQueries({ queryKey: ["journeys"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const isLoading = journeysLoading || statsLoading;
 
@@ -161,12 +182,24 @@ export default function DashboardPage() {
                         <CardTitle className="text-base truncate mr-2">
                           {goalsMap?.[journey.goal_id]?.title ?? "Journey"}
                         </CardTitle>
-                        <Badge
-                          variant="outline"
-                          className={statusColors[journey.status] ?? ""}
-                        >
-                          {journey.status}
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => handleDelete(e, journey.id)}
+                            disabled={deletingId === journey.id}
+                            title="Delete journey"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Badge
+                            variant="outline"
+                            className={statusColors[journey.status] ?? ""}
+                          >
+                            {journey.status}
+                          </Badge>
+                        </div>
                       </div>
                       <CardDescription>
                         Created{" "}

@@ -70,6 +70,17 @@ async def get_journey(
     )
 
 
+@router.delete("/journeys/{journey_id}", status_code=204)
+async def delete_journey(
+    journey_id: uuid.UUID,
+    current_user: User = Depends(require_role("editor")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a journey and all its perspectives (cascade)."""
+    await journey_service.delete_journey(db, current_user.organization_id, journey_id)
+    await db.commit()
+
+
 @router.patch("/journeys/{journey_id}/status", response_model=JourneyResponse)
 async def update_journey_status(
     journey_id: uuid.UUID,

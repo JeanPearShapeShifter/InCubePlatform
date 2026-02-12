@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { apiGet, apiPost, apiPatch } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import type { Journey, Perspective } from "@/types";
 
 interface JourneyDetailResponse extends Journey {
@@ -19,6 +19,7 @@ interface JourneyState {
 interface JourneyActions {
   fetchJourneys: () => Promise<void>;
   createJourney: (goalId: string) => Promise<Journey>;
+  deleteJourney: (id: string) => Promise<void>;
   setActiveJourney: (id: string) => void;
   fetchAndSetActiveJourney: (id: string) => Promise<void>;
   fetchPerspectives: (journeyId: string) => Promise<void>;
@@ -48,6 +49,14 @@ export const useJourneyStore = create<JourneyState & JourneyActions>(
       });
       set((state) => ({ journeys: [journey, ...state.journeys] }));
       return journey;
+    },
+
+    deleteJourney: async (id: string) => {
+      await apiDelete(`/api/journeys/${id}`);
+      set((state) => ({
+        journeys: state.journeys.filter((j) => j.id !== id),
+        activeJourney: state.activeJourney?.id === id ? null : state.activeJourney,
+      }));
     },
 
     setActiveJourney: (id: string) => {
