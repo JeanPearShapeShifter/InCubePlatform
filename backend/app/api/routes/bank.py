@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.schemas.bank import BankCreate, BankInstanceDetail, BankInstanceResponse, BankTimelineResponse
+from app.schemas.bank import (
+    BankCreate,
+    BankInstanceDetail,
+    BankInstanceResponse,
+    BankTimelineResponse,
+    SynopsisResponse,
+)
 from app.services import bank as bank_service
 
 router = APIRouter()
@@ -30,6 +36,15 @@ async def create_bank_instance(
         decision_audit=decision_audit,
     )
     return BankInstanceResponse.model_validate(bank)
+
+
+@router.post("/perspectives/{perspective_id}/synopsis", response_model=SynopsisResponse)
+async def generate_synopsis(
+    perspective_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> SynopsisResponse:
+    synopsis, input_tokens, output_tokens = await bank_service.generate_synopsis(db, perspective_id)
+    return SynopsisResponse(synopsis=synopsis, input_tokens=input_tokens, output_tokens=output_tokens)
 
 
 @router.get("/journeys/{journey_id}/bank", response_model=BankTimelineResponse)

@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Any
 
@@ -5,9 +6,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError, ValidationError
+from app.models.agent_session import AgentSession
+from app.models.axiom_challenge import AxiomChallenge
 from app.models.bank_instance import BankInstance
 from app.models.enums import BankType, DimensionType, PerspectiveStatus, PhaseType
 from app.models.perspective import Perspective
+from app.services.agents.base import BaseAgent
+
+logger = logging.getLogger(__name__)
 
 
 def _determine_bank_type(dimension: str, phase: str) -> str:
@@ -126,3 +132,87 @@ async def get_bank_instance(db: AsyncSession, bank_id: uuid.UUID) -> BankInstanc
     if not bank:
         raise NotFoundError("Bank instance not found")
     return bank
+
+
+_SYNOPSIS_SYSTEM = (
+    "You are a concise business analyst. Given the outputs of specialist AI agents "
+    "and any challenges raised by the Axiom reviewer, write a clear, actionable synopsis "
+    "of the analysis (3-5 paragraphs). Focus on key findings, risks identified, and "
+    "recommended actions. Do NOT use bullet points for the main body — use flowing prose. "
+    "Keep it under 800 words."
+)
+
+
+async def generate_synopsis(
+    db: AsyncSession,
+    perspective_id: uuid.UUID,
+) -> tuple[str, int, int]:
+    """Generate an AI synopsis from agent outputs and axiom challenges.
+
+    Returns (synopsis_text, input_tokens, output_tokens).
+    """
+    # Fetch latest agent session per agent
+    subq = (
+        select(
+            AgentSession.agent_name,
+            func.max(AgentSession.created_at).label("latest"),
+        )
+        .where(AgentSession.perspective_id == perspective_id)
+        .group_by(AgentSession.agent_name)
+        .subquery()
+    )
+    result = await db.execute(
+        select(AgentSession)
+        .join(
+            subq,
+            (AgentSession.agent_name == subq.c.agent_name)
+            & (AgentSession.created_at == subq.c.latest),
+        )
+        .where(AgentSession.perspective_id == perspective_id)
+    )
+    sessions = list(result.scalars().all())
+
+    if not sessions:
+        raise ValidationError("No agent sessions found for this perspective")
+
+    # Build specialist outputs section
+    parts: list[str] = []
+    for session in sessions:
+        content = (session.response_payload or {}).get("content", "")
+        if content:
+            truncated = content[:1500]
+            parts.append(f"### {session.agent_name.capitalize()}\n{truncated}")
+
+    # Fetch axiom challenges
+    challenge_result = await db.execute(
+        select(AxiomChallenge)
+        .where(AxiomChallenge.perspective_id == perspective_id)
+        .order_by(AxiomChallenge.created_at)
+    )
+    challenges = list(challenge_result.scalars().all())
+
+    challenge_parts: list[str] = []
+    for ch in challenges:
+        entry = f"- **Challenge** ({ch.severity}): {ch.challenge_text}"
+        if ch.resolution_text:
+            entry += f"\n  **Verdict** ({ch.resolution}): {ch.resolution_text}"
+        challenge_parts.append(entry)
+
+    prompt_sections = ["## Specialist Agent Outputs\n"] + parts
+    if challenge_parts:
+        prompt_sections.append("\n## Axiom Review\n" + "\n".join(challenge_parts))
+    prompt_sections.append(
+        "\n---\nWrite a synopsis summarizing the above analysis."
+    )
+
+    prompt = "\n\n".join(prompt_sections)
+
+    agent = BaseAgent("axiom")
+    synopsis, input_tokens, output_tokens = await agent.raw_chat(
+        prompt, _SYNOPSIS_SYSTEM, max_tokens=1024,
+    )
+    logger.info(
+        "generate_synopsis perspective=%s tokens_in=%d tokens_out=%d",
+        perspective_id, input_tokens, output_tokens,
+    )
+    return synopsis, input_tokens, output_tokens
