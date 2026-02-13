@@ -147,18 +147,21 @@ class BaseAgent:
             "duration_ms": duration_ms,
         })
 
-    async def raw_chat(self, message: str, system_prompt: str) -> tuple[str, int, int]:
+    async def raw_chat(
+        self, message: str, system_prompt: str, *, max_tokens: int = 4096,
+    ) -> tuple[str, int, int]:
         """Non-streaming chat that returns (content, input_tokens, output_tokens).
 
         Used internally by the orchestrator and Axiom for structured responses.
         """
         model = settings.default_agent_model
-        logger.info("raw_chat [%s] calling model=%s prompt_len=%d", self.name, model, len(message))
+        logger.info("raw_chat [%s] calling model=%s prompt_len=%d max_tokens=%d",
+                     self.name, model, len(message), max_tokens)
 
         try:
             response = await self._client.messages.create(
                 model=model,
-                max_tokens=4096,
+                max_tokens=max_tokens,
                 system=system_prompt,
                 messages=[{"role": "user", "content": message}],
             )

@@ -39,7 +39,7 @@ class BoomerangOrchestrator:
         """Run all 9 agents through the boomerang flow, yielding SSE events."""
         yield sse_event("boomerang_start", {"perspective_id": str(context.perspective_id)})
 
-        # Phase 1: Run 8 specialist agents in parallel
+        # Phase 1: Run 8 specialist agents in parallel, stream results as they arrive
         yield sse_event("phase", {"phase": "specialists", "message": "Running specialist agents..."})
         specialist_outputs: dict[str, str] = {}
 
@@ -52,14 +52,27 @@ class BoomerangOrchestrator:
         for name in SPECIALIST_AGENTS:
             yield sse_event("agent_start", {"agent": name})
 
-        tasks = [run_specialist(AGENT_REGISTRY[name]) for name in SPECIALIST_AGENTS]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Use as_completed so we yield agent_complete events as each finishes
+        # instead of waiting for all 8 to complete before sending any events
+        tasks = {
+            asyncio.ensure_future(run_specialist(AGENT_REGISTRY[name])): name
+            for name in SPECIALIST_AGENTS
+        }
 
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error("Specialist agent failed: %s", result)
+        for coro in asyncio.as_completed(list(tasks.keys())):
+            try:
+                name, content, in_tok, out_tok = await coro
+            except Exception as exc:
+                # Find which agent failed
+                failed_name = "unknown"
+                for task, task_name in tasks.items():
+                    if task.done() and task.exception() is exc:
+                        failed_name = task_name
+                        break
+                logger.error("Specialist agent %s failed: %s", failed_name, exc)
+                yield sse_event("agent_error", {"agent": failed_name, "error": str(exc)})
                 continue
-            name, content, in_tok, out_tok = result
+
             specialist_outputs[name] = content
 
             # Record API usage for this specialist call
@@ -71,6 +84,10 @@ class BoomerangOrchestrator:
             yield sse_event("agent_complete", {
                 "agent": name,
                 "content": content,
+            })
+            yield sse_event("phase", {
+                "phase": "specialists",
+                "message": f"{len(specialist_outputs)}/{len(SPECIALIST_AGENTS)} specialists complete...",
             })
 
         if not specialist_outputs:

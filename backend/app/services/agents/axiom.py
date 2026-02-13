@@ -64,7 +64,10 @@ class AxiomChallenger:
         system = build_system_prompt("axiom", context.dimension, context.phase)
 
         start = time.monotonic()
-        content, input_tokens, output_tokens = await self._axiom.raw_chat(prompt, system)
+        # Axiom reviews all 8 specialist outputs — needs more tokens than default
+        content, input_tokens, output_tokens = await self._axiom.raw_chat(
+            prompt, system, max_tokens=8192,
+        )
         duration_ms = int((time.monotonic() - start) * 1000)
 
         cost_cents = (
