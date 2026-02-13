@@ -19,6 +19,7 @@ from app.services.agents.base import (
     COST_PER_OUTPUT_TOKEN,
     AgentContext,
     BaseAgent,
+    FatalAgentError,
     record_api_usage,
 )
 from app.services.agents.prompts import (
@@ -215,11 +216,24 @@ class AxiomChallenger:
         # Step 1: Axiom produces challenges
         try:
             challenges, _raw = await self.challenge(specialist_outputs, context, db)
-        except Exception:
+        except FatalAgentError as exc:
+            logger.error("Axiom challenge generation hit fatal error: %s", exc)
+            yield sse_event("agent_error", {
+                "agent": "axiom",
+                "error": str(exc),
+                "error_type": exc.error_type,
+            })
+            yield sse_event("boomerang_error", {
+                "error": str(exc),
+                "error_type": exc.error_type,
+            })
+            return
+        except Exception as exc:
             logger.exception("Axiom challenge generation failed")
             yield sse_event("agent_error", {
                 "agent": "axiom",
-                "error": "Failed to generate challenges",
+                "error": f"Failed to generate challenges: {exc}",
+                "error_type": "unknown",
             })
             return
 
@@ -242,11 +256,24 @@ class AxiomChallenger:
                         response_text, _session_id = await self.get_agent_response(
                             agent, ch.challenge_text, context, db,
                         )
-                    except Exception:
+                    except FatalAgentError as exc:
+                        logger.error("Agent %s hit fatal error during challenge response: %s", agent_name, exc)
+                        yield sse_event("agent_error", {
+                            "agent": agent_name,
+                            "error": str(exc),
+                            "error_type": exc.error_type,
+                        })
+                        yield sse_event("boomerang_error", {
+                            "error": str(exc),
+                            "error_type": exc.error_type,
+                        })
+                        return
+                    except Exception as exc:
                         logger.exception("Agent %s failed to respond to challenge", agent_name)
                         yield sse_event("agent_error", {
                             "agent": agent_name,
-                            "error": f"Failed to respond to challenge: {ch.challenge_text[:100]}",
+                            "error": f"Failed to respond to challenge: {exc}",
+                            "error_type": "unknown",
                         })
                         continue
                     responses[agent_name] = response_text
@@ -259,11 +286,24 @@ class AxiomChallenger:
             # Step 3: Axiom evaluates
             try:
                 verdict = await self.evaluate(ch, responses, context, db)
-            except Exception:
+            except FatalAgentError as exc:
+                logger.error("Axiom verdict hit fatal error: %s", exc)
+                yield sse_event("agent_error", {
+                    "agent": "axiom",
+                    "error": str(exc),
+                    "error_type": exc.error_type,
+                })
+                yield sse_event("boomerang_error", {
+                    "error": str(exc),
+                    "error_type": exc.error_type,
+                })
+                return
+            except Exception as exc:
                 logger.exception("Axiom verdict evaluation failed")
                 yield sse_event("agent_error", {
                     "agent": "axiom",
-                    "error": "Failed to evaluate challenge responses",
+                    "error": f"Failed to evaluate challenge responses: {exc}",
+                    "error_type": "unknown",
                 })
                 continue
             yield sse_event("axiom_verdict", {

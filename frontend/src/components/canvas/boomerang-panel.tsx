@@ -30,6 +30,16 @@ import type { AgentName } from "@/types";
 
 const STALL_TIMEOUT_MS = 90_000;
 
+const FATAL_ERROR_MESSAGES: Record<string, string> = {
+  credit_balance:
+    "API credit balance exhausted. Add credits in Settings > API Key to continue.",
+  auth: "Invalid API key. Check your API key in Settings.",
+};
+
+function getFatalErrorMessage(errorType: string, fallback: string): string {
+  return FATAL_ERROR_MESSAGES[errorType] ?? fallback;
+}
+
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -78,6 +88,7 @@ export function BoomerangPanel({
   const [phaseMessage, setPhaseMessage] = useState<string>("");
   const [isStalled, setIsStalled] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [fatalError, setFatalError] = useState<{ message: string; errorType: string } | null>(null);
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Elapsed timer
@@ -125,6 +136,7 @@ export function BoomerangPanel({
     setPhaseMessage("Connecting...");
     setIsStalled(false);
     setIsComplete(false);
+    setFatalError(null);
 
     const controller = connectSSE(
       `/api/perspectives/${perspectiveId}/boomerang`,
@@ -169,6 +181,21 @@ export function BoomerangPanel({
                   content: data.error ?? "Agent failed",
                 });
                 break;
+              case "boomerang_error": {
+                const errorType = (data.error_type as string) ?? "unknown";
+                const errorMsg = getFatalErrorMessage(
+                  errorType,
+                  (data.error as string) ?? "An error occurred",
+                );
+                setFatalError({ message: errorMsg, errorType });
+                setPhaseMessage("");
+                stopBoomerang();
+                setIsStalled(false);
+                if (stallTimerRef.current)
+                  clearTimeout(stallTimerRef.current);
+                if (timerRef.current) clearInterval(timerRef.current);
+                break;
+              }
               case "axiom_start":
                 setAgentOutput("axiom", { status: "running" });
                 setPhaseMessage("Axiom is reviewing specialist outputs...");
@@ -355,8 +382,23 @@ export function BoomerangPanel({
             </div>
           )}
 
+          {/* Fatal error banner */}
+          {fatalError && (
+            <div className="rounded-md border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 px-3 py-2 text-xs text-[var(--color-error)]">
+              <div className="flex items-center gap-1.5 font-medium">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                {fatalError.errorType === "credit_balance"
+                  ? "API Credits Exhausted"
+                  : fatalError.errorType === "auth"
+                    ? "Authentication Error"
+                    : "Fatal Error"}
+              </div>
+              <p className="mt-1">{fatalError.message}</p>
+            </div>
+          )}
+
           {/* Completion message */}
-          {isComplete && (
+          {isComplete && !fatalError && (
             <div className="rounded-md border border-[var(--color-success)]/30 bg-[var(--color-success)]/5 px-3 py-2 text-xs text-[var(--color-success)]">
               Analysis complete in {formatElapsed(elapsedSeconds)}. Bank this perspective to save your findings.
             </div>
@@ -392,11 +434,50 @@ export function BoomerangPanel({
 
           <ScrollArea className="h-[calc(100vh-340px)]">
             <div className="space-y-2 pr-4" aria-live="polite">
+              {/* Collapsed error banner when all errors share the same message */}
+              {(() => {
+                const errorOutputs = agents
+                  .map((a) => agentOutputs[a.name])
+                  .filter((o) => o?.status === "error" && o.content);
+                if (errorOutputs.length >= 3) {
+                  const firstError = errorOutputs[0]?.content ?? "";
+                  const allSame = errorOutputs.every(
+                    (o) => o?.content === firstError,
+                  );
+                  if (allSame) {
+                    return (
+                      <div className="rounded-md border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 px-3 py-2 text-xs text-[var(--color-error)]">
+                        <div className="flex items-center gap-1.5 font-medium">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          {errorOutputs.length} agents failed with the same
+                          error
+                        </div>
+                        <p className="mt-1">{firstError}</p>
+                      </div>
+                    );
+                  }
+                }
+                return null;
+              })()}
+
               {agents.map((agent) => {
                 const output = agentOutputs[agent.name];
                 const status = output?.status ?? "pending";
                 const tokens = (output?.inputTokens ?? 0) + (output?.outputTokens ?? 0);
                 const cost = output?.costUsd ?? 0;
+
+                // When there's a fatal error banner, hide individual error content
+                // to avoid showing 8 identical error messages
+                const errorOutputs = agents
+                  .map((a) => agentOutputs[a.name])
+                  .filter((o) => o?.status === "error" && o.content);
+                const allSameError =
+                  errorOutputs.length >= 3 &&
+                  errorOutputs.every(
+                    (o) => o?.content === errorOutputs[0]?.content,
+                  );
+                const hideErrorContent =
+                  status === "error" && (fatalError != null || allSameError);
 
                 return (
                   <div
@@ -428,7 +509,7 @@ export function BoomerangPanel({
                         {cost > 0 && <span>{formatCost(cost)}</span>}
                       </div>
                     )}
-                    {output?.content && (
+                    {output?.content && !hideErrorContent && (
                       <p
                         className={cn(
                           "mt-1.5 text-xs line-clamp-3",
