@@ -17,6 +17,7 @@ from app.services.agents.base import (
     COST_PER_OUTPUT_TOKEN,
     AgentContext,
     BaseAgent,
+    FatalAgentError,
     record_api_usage,
 )
 from app.services.agents.prompts import VALID_AGENT_NAMES, build_system_prompt
@@ -61,9 +62,34 @@ class BoomerangOrchestrator:
             for name in SPECIALIST_AGENTS
         }
 
+        fatal_error: FatalAgentError | None = None
+
         for coro in asyncio.as_completed(list(tasks.keys())):
             try:
                 name, content, in_tok, out_tok = await coro
+            except FatalAgentError as exc:
+                # Fatal error — cancel all pending tasks and abort immediately
+                failed_name = "unknown"
+                for task, task_name in tasks.items():
+                    if task.done():
+                        try:
+                            task.exception()
+                        except BaseException:
+                            if task_name != "unknown":
+                                failed_name = task_name
+                                break
+                logger.error("Fatal API error from %s: %s", failed_name, exc)
+                yield sse_event("agent_error", {
+                    "agent": failed_name,
+                    "error": str(exc),
+                    "error_type": exc.error_type,
+                })
+                fatal_error = exc
+                # Cancel all still-pending tasks
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                break
             except Exception as exc:
                 # Find which agent failed
                 failed_name = "unknown"
@@ -72,7 +98,11 @@ class BoomerangOrchestrator:
                         failed_name = task_name
                         break
                 logger.error("Specialist agent %s failed: %s", failed_name, exc)
-                yield sse_event("agent_error", {"agent": failed_name, "error": str(exc)})
+                yield sse_event("agent_error", {
+                    "agent": failed_name,
+                    "error": str(exc),
+                    "error_type": "unknown",
+                })
                 continue
 
             specialist_outputs[name] = content
@@ -96,6 +126,24 @@ class BoomerangOrchestrator:
                 "message": f"{len(specialist_outputs)}/{len(SPECIALIST_AGENTS)} specialists complete...",
             })
 
+        # If a fatal error occurred, abort the entire flow
+        if fatal_error is not None:
+            _error_messages = {
+                "credit_balance": "API credit balance exhausted. Add credits at console.anthropic.com to continue.",
+                "auth": "Invalid API key. Check your API key in Settings.",
+            }
+            yield sse_event("boomerang_error", {
+                "error": _error_messages.get(fatal_error.error_type, str(fatal_error)),
+                "error_type": fatal_error.error_type,
+            })
+            yield sse_event("boomerang_complete", {
+                "perspective_id": str(context.perspective_id),
+                "agents_completed": list(specialist_outputs.keys()),
+                "aborted": True,
+                "error_type": fatal_error.error_type,
+            })
+            return
+
         if not specialist_outputs:
             yield sse_event("error", {"error": "All specialist agents failed"})
             return
@@ -109,9 +157,24 @@ class BoomerangOrchestrator:
         try:
             async for event in self._challenger.stream_challenge(specialist_outputs, context, db):
                 yield event
-        except Exception:
+        except FatalAgentError as exc:
+            logger.error("Axiom phase hit fatal error: %s", exc)
+            yield sse_event("agent_error", {
+                "agent": "axiom",
+                "error": str(exc),
+                "error_type": exc.error_type,
+            })
+            yield sse_event("boomerang_error", {
+                "error": str(exc),
+                "error_type": exc.error_type,
+            })
+        except Exception as exc:
             logger.exception("Axiom challenge phase failed")
-            yield sse_event("agent_error", {"agent": "axiom", "error": "Axiom challenge phase failed"})
+            yield sse_event("agent_error", {
+                "agent": "axiom",
+                "error": f"Axiom challenge phase failed: {exc}",
+                "error_type": "unknown",
+            })
 
         logger.info("Axiom phase complete. Emitting boomerang_complete.")
         yield sse_event("boomerang_complete", {

@@ -19,6 +19,50 @@ from app.services.agents.prompts import AGENT_DEFINITIONS, build_system_prompt
 
 logger = logging.getLogger(__name__)
 
+# --- Error classification ---
+
+# Fatal errors: no point retrying, all subsequent calls will also fail
+_FATAL_PATTERNS = [
+    "credit balance is too low",
+    "insufficient_quota",
+    "invalid x-api-key",
+    "invalid api key",
+    "account has been disabled",
+    "account has been suspended",
+]
+
+
+def classify_api_error(exc: anthropic.APIError) -> str:
+    """Classify an Anthropic API error as a specific error_type.
+
+    Returns one of: "credit_balance", "auth", "rate_limit", "unknown".
+    """
+    msg = str(exc).lower()
+    if any(p in msg for p in ("credit balance", "insufficient_quota")):
+        return "credit_balance"
+    if any(p in msg for p in ("invalid x-api-key", "invalid api key", "disabled", "suspended")):
+        return "auth"
+    if "rate limit" in msg or isinstance(exc, anthropic.RateLimitError):
+        return "rate_limit"
+    return "unknown"
+
+
+def is_fatal_api_error(exc: Exception) -> bool:
+    """Return True if the error is fatal and all subsequent API calls will also fail."""
+    if not isinstance(exc, anthropic.APIError):
+        return False
+    return classify_api_error(exc) in ("credit_balance", "auth")
+
+
+class FatalAgentError(Exception):
+    """Raised when a fatal API error is detected (credits exhausted, bad key, etc.)."""
+
+    def __init__(self, message: str, error_type: str, original: Exception | None = None):
+        super().__init__(message)
+        self.error_type = error_type
+        self.original = original
+
+
 # Haiku pricing: input $0.25/MTok, output $1.25/MTok (in dollars)
 COST_PER_INPUT_TOKEN = 0.25 / 1_000_000   # dollars per token
 COST_PER_OUTPUT_TOKEN = 1.25 / 1_000_000   # dollars per token
@@ -108,8 +152,13 @@ class BaseAgent:
                 output_tokens = response.usage.output_tokens
 
         except anthropic.APIError as exc:
-            logger.error("Anthropic API error for agent %s: %s", self.name, exc)
-            yield sse_event("error", {"agent": self.name, "error": str(exc)})
+            error_type = classify_api_error(exc)
+            logger.error("Anthropic API error for agent %s (%s): %s", self.name, error_type, exc)
+            yield sse_event("agent_error", {
+                "agent": self.name,
+                "error": str(exc),
+                "error_type": error_type,
+            })
             return
 
         duration_ms = int((time.monotonic() - start) * 1000)
@@ -166,7 +215,11 @@ class BaseAgent:
                 messages=[{"role": "user", "content": message}],
             )
         except anthropic.APIError as exc:
-            logger.error("raw_chat [%s] Anthropic API error: %s %s", self.name, type(exc).__name__, exc)
+            error_type = classify_api_error(exc)
+            logger.error("raw_chat [%s] Anthropic API error (%s): %s %s",
+                         self.name, error_type, type(exc).__name__, exc)
+            if is_fatal_api_error(exc):
+                raise FatalAgentError(str(exc), error_type=error_type, original=exc) from exc
             raise
         except Exception as exc:
             logger.error("raw_chat [%s] unexpected error: %s %s", self.name, type(exc).__name__, exc)
