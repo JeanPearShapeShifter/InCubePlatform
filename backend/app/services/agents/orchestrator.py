@@ -40,6 +40,7 @@ class BoomerangOrchestrator:
         yield sse_event("boomerang_start", {"perspective_id": str(context.perspective_id)})
 
         # Phase 1: Run 8 specialist agents in parallel
+        yield sse_event("phase", {"phase": "specialists", "message": "Running specialist agents..."})
         specialist_outputs: dict[str, str] = {}
 
         async def run_specialist(agent: BaseAgent) -> tuple[str, str, int, int]:
@@ -79,6 +80,7 @@ class BoomerangOrchestrator:
         # Phase 2: Axiom challenge flow
         logger.info("Specialists complete (%d/%d). Starting Axiom challenge phase.",
                      len(specialist_outputs), len(SPECIALIST_AGENTS))
+        yield sse_event("phase", {"phase": "axiom", "message": "Axiom is reviewing specialist outputs..."})
         yield sse_event("axiom_start", {"agent": "axiom"})
 
         try:

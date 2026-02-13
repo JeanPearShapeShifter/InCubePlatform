@@ -152,13 +152,29 @@ class BaseAgent:
 
         Used internally by the orchestrator and Axiom for structured responses.
         """
-        response = await self._client.messages.create(
-            model=settings.default_agent_model,
-            max_tokens=4096,
-            system=system_prompt,
-            messages=[{"role": "user", "content": message}],
+        model = settings.default_agent_model
+        logger.info("raw_chat [%s] calling model=%s prompt_len=%d", self.name, model, len(message))
+
+        try:
+            response = await self._client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=[{"role": "user", "content": message}],
+            )
+        except anthropic.APIError as exc:
+            logger.error("raw_chat [%s] Anthropic API error: %s %s", self.name, type(exc).__name__, exc)
+            raise
+        except Exception as exc:
+            logger.error("raw_chat [%s] unexpected error: %s %s", self.name, type(exc).__name__, exc)
+            raise
+
+        content = response.content[0].text if response.content else ""
+        logger.info(
+            "raw_chat [%s] success: in=%d out=%d content_len=%d stop=%s",
+            self.name, response.usage.input_tokens, response.usage.output_tokens,
+            len(content), response.stop_reason,
         )
-        content = response.content[0].text
         return content, response.usage.input_tokens, response.usage.output_tokens
 
 
