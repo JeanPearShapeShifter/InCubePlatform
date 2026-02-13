@@ -13,6 +13,8 @@ from app.core.sse import sse_event
 from app.services.agents.axiom import AxiomChallenger
 from app.services.agents.base import (
     AGENT_REGISTRY,
+    COST_PER_INPUT_TOKEN,
+    COST_PER_OUTPUT_TOKEN,
     AgentContext,
     BaseAgent,
     record_api_usage,
@@ -81,9 +83,13 @@ class BoomerangOrchestrator:
                 in_tok, out_tok, endpoint=f"boomerang/specialist/{name}",
             )
 
+            cost_usd = in_tok * COST_PER_INPUT_TOKEN + out_tok * COST_PER_OUTPUT_TOKEN
             yield sse_event("agent_complete", {
                 "agent": name,
                 "content": content,
+                "input_tokens": in_tok,
+                "output_tokens": out_tok,
+                "cost_usd": round(cost_usd, 6),
             })
             yield sse_event("phase", {
                 "phase": "specialists",

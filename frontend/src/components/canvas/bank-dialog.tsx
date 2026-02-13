@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Vault } from "lucide-react";
 import { apiPost } from "@/lib/api";
@@ -27,6 +28,7 @@ export function BankDialog({
   onOpenChange,
   perspectiveId,
 }: BankDialogProps) {
+  const queryClient = useQueryClient();
   const [synopsis, setSynopsis] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,6 +43,7 @@ export function BankDialog({
         { synopsis: synopsis.trim() },
       );
       toast.success("Perspective banked successfully");
+      queryClient.invalidateQueries({ queryKey: ["bank-timeline"] });
       setSynopsis("");
       onOpenChange(false);
     } catch (err) {

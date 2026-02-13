@@ -8,6 +8,8 @@ import {
   Circle,
   XCircle,
   RotateCcw,
+  Clock,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import { useCanvasStore, AGENTS } from "@/stores/canvas-store";
 import type { AgentOutput } from "@/stores/canvas-store";
@@ -25,7 +28,19 @@ import { useJourneyStore } from "@/stores/journey-store";
 import { connectSSE } from "@/lib/sse";
 import type { AgentName } from "@/types";
 
-const STALL_TIMEOUT_MS = 90_000; // 90 seconds without events = stalled
+const STALL_TIMEOUT_MS = 90_000;
+
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatCost(usd: number): string {
+  if (usd <= 0) return "";
+  if (usd < 0.01) return `$${usd.toFixed(4)}`;
+  return `$${usd.toFixed(2)}`;
+}
 
 const StatusIcon = ({ status }: { status: AgentOutput["status"] }) => {
   switch (status) {
@@ -62,9 +77,13 @@ export function BoomerangPanel({
   const abortRef = useRef<AbortController | null>(null);
   const [phaseMessage, setPhaseMessage] = useState<string>("");
   const [isStalled, setIsStalled] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** Read the latest axiom content from the store (avoids stale closure). */
+  // Elapsed timer
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const getAxiomContent = useCallback((): string => {
     return useCanvasStore.getState().agentOutputs["axiom"]?.content ?? "";
   }, []);
@@ -81,13 +100,31 @@ export function BoomerangPanel({
     setPhaseMessage("Cancelled by user");
     setIsStalled(false);
     if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
   }, [stopBoomerang]);
+
+  // Start/stop elapsed timer based on boomerang state
+  useEffect(() => {
+    if (isBoomerangRunning && open) {
+      setElapsedSeconds(0);
+      setIsComplete(false);
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isBoomerangRunning, open]);
 
   useEffect(() => {
     if (!open || !perspectiveId || !isBoomerangRunning) return;
 
     setPhaseMessage("Connecting...");
     setIsStalled(false);
+    setIsComplete(false);
 
     const controller = connectSSE(
       `/api/perspectives/${perspectiveId}/boomerang`,
@@ -166,7 +203,6 @@ export function BoomerangPanel({
                 setPhaseMessage("Axiom delivered verdict");
                 break;
               case "boomerang_complete": {
-                // Mark axiom as complete if it was running
                 const axiomState =
                   useCanvasStore.getState().agentOutputs["axiom"];
                 if (
@@ -179,9 +215,11 @@ export function BoomerangPanel({
                   });
                 }
                 stopBoomerang();
-                setPhaseMessage("Complete");
+                setIsComplete(true);
+                setPhaseMessage("");
                 if (stallTimerRef.current)
                   clearTimeout(stallTimerRef.current);
+                if (timerRef.current) clearInterval(timerRef.current);
                 if (perspectiveId) {
                   updatePerspectiveStatus(
                     perspectiveId,
@@ -203,10 +241,12 @@ export function BoomerangPanel({
           stopBoomerang();
           setPhaseMessage("Connection error");
           if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
+          if (timerRef.current) clearInterval(timerRef.current);
         },
         onClose: () => {
           stopBoomerang();
           if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
+          if (timerRef.current) clearInterval(timerRef.current);
         },
       },
     );
@@ -232,6 +272,16 @@ export function BoomerangPanel({
   const progressPercent =
     totalAgents > 0 ? (doneCount / totalAgents) * 100 : 0;
 
+  // Calculate totals
+  const totalTokens = Object.values(agentOutputs).reduce(
+    (sum, o) => sum + (o.inputTokens ?? 0) + (o.outputTokens ?? 0),
+    0,
+  );
+  const totalCost = Object.values(agentOutputs).reduce(
+    (sum, o) => sum + (o.costUsd ?? 0),
+    0,
+  );
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[400px] sm:w-[480px]">
@@ -242,24 +292,52 @@ export function BoomerangPanel({
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
             )}
           </SheetTitle>
+          <SheetDescription>
+            {isBoomerangRunning
+              ? "8 specialist agents analyze this perspective in parallel, then Axiom challenges their findings to strengthen the analysis."
+              : isComplete
+                ? "Analysis complete. Bank this perspective to save your findings."
+                : "Run all 9 agents to get a comprehensive analysis of this perspective."}
+          </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 space-y-4">
-          {/* Progress section */}
+        <div className="mt-4 space-y-3">
+          {/* Progress + Timer row */}
           <div className="space-y-1" role="status" aria-label="Boomerang progress">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium">
-                {completedCount} / {totalAgents}
-                {errorCount > 0 && (
-                  <span className="text-[var(--color-error)] ml-1">
-                    ({errorCount} failed)
+              <div className="flex items-center gap-3">
+                {(isBoomerangRunning || elapsedSeconds > 0) && (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    {formatElapsed(elapsedSeconds)}
                   </span>
                 )}
-              </span>
+                <span className="font-medium">
+                  {completedCount} / {totalAgents}
+                  {errorCount > 0 && (
+                    <span className="text-[var(--color-error)] ml-1">
+                      ({errorCount} failed)
+                    </span>
+                  )}
+                </span>
+              </div>
             </div>
             <Progress value={progressPercent} className="h-2" />
           </div>
+
+          {/* Token/cost summary */}
+          {totalTokens > 0 && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Coins className="h-3 w-3" />
+                {totalTokens.toLocaleString()} tokens
+              </span>
+              {totalCost > 0 && (
+                <span>{formatCost(totalCost)}</span>
+              )}
+            </div>
+          )}
 
           {/* Status message */}
           {(phaseMessage || isStalled) && (
@@ -274,6 +352,13 @@ export function BoomerangPanel({
               {isStalled
                 ? "No response received for a while. The process may be stalled."
                 : phaseMessage}
+            </div>
+          )}
+
+          {/* Completion message */}
+          {isComplete && (
+            <div className="rounded-md border border-[var(--color-success)]/30 bg-[var(--color-success)]/5 px-3 py-2 text-xs text-[var(--color-success)]">
+              Analysis complete in {formatElapsed(elapsedSeconds)}. Bank this perspective to save your findings.
             </div>
           )}
 
@@ -295,7 +380,6 @@ export function BoomerangPanel({
                   size="sm"
                   onClick={() => {
                     handleCancel();
-                    // Allow UI to update, then user can re-trigger
                   }}
                   className="flex items-center gap-1.5"
                 >
@@ -306,11 +390,13 @@ export function BoomerangPanel({
             </div>
           )}
 
-          <ScrollArea className="h-[calc(100vh-280px)]">
+          <ScrollArea className="h-[calc(100vh-340px)]">
             <div className="space-y-2 pr-4" aria-live="polite">
               {agents.map((agent) => {
                 const output = agentOutputs[agent.name];
                 const status = output?.status ?? "pending";
+                const tokens = (output?.inputTokens ?? 0) + (output?.outputTokens ?? 0);
+                const cost = output?.costUsd ?? 0;
 
                 return (
                   <div
@@ -335,10 +421,17 @@ export function BoomerangPanel({
                       </span>
                       <StatusIcon status={status} />
                     </div>
+                    {/* Token + cost info */}
+                    {status === "complete" && tokens > 0 && (
+                      <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span>{tokens.toLocaleString()} tokens</span>
+                        {cost > 0 && <span>{formatCost(cost)}</span>}
+                      </div>
+                    )}
                     {output?.content && (
                       <p
                         className={cn(
-                          "mt-2 text-xs line-clamp-3",
+                          "mt-1.5 text-xs line-clamp-3",
                           status === "error"
                             ? "text-[var(--color-error)]"
                             : "text-muted-foreground",

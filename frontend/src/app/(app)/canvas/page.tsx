@@ -36,13 +36,16 @@ function CanvasContent() {
   const [boomerangOpen, setBoomerangOpen] = useState(false);
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
 
-  // Sync journey from URL param
+  // Sync journey from URL param, or restore from store
   useEffect(() => {
     if (journeyId && journeyId !== activeJourneyId) {
       setActiveJourneyId(journeyId);
       fetchAndSetActiveJourney(journeyId).then(() => {
         fetchPerspectives(journeyId);
       });
+    } else if (!journeyId && activeJourney) {
+      // No journey in URL but we have one in store — restore it
+      router.replace(`/canvas?journey=${activeJourney.id}`);
     }
   }, [journeyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
