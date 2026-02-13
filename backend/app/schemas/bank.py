@@ -59,3 +59,9 @@ class BankInstanceDetail(BaseModel):
 
 class BankTimelineResponse(BaseModel):
     bank_instances: list[BankInstanceResponse]
+
+
+class SynopsisResponse(BaseModel):
+    synopsis: str
+    input_tokens: int
+    output_tokens: int

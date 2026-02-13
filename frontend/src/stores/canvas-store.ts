@@ -6,6 +6,8 @@ import type {
   PhaseType,
   AgentName,
   PerspectiveStatus,
+  ChallengeSeverity,
+  ChallengeResolution,
 } from "@/types";
 
 export interface AgentOutput {
@@ -22,11 +24,38 @@ export interface ActivePerspective {
   phase: PhaseType;
 }
 
+// Timeline event discriminated union
+export type TimelineEvent =
+  | { type: "agent_start"; timestamp: number; agent: AgentName }
+  | { type: "agent_complete"; timestamp: number; agent: AgentName; snippet: string }
+  | { type: "agent_error"; timestamp: number; agent: AgentName; error: string }
+  | { type: "phase"; timestamp: number; message: string }
+  | {
+      type: "axiom_challenge";
+      timestamp: number;
+      agents: string[];
+      challengeText: string;
+      severity: ChallengeSeverity;
+    }
+  | {
+      type: "challenge_response";
+      timestamp: number;
+      agent: string;
+      response: string;
+    }
+  | {
+      type: "axiom_verdict";
+      timestamp: number;
+      resolution: ChallengeResolution | string;
+      resolutionText: string;
+    };
+
 interface CanvasState {
   activeJourneyId: string | null;
   activePerspective: ActivePerspective | null;
   agentOutputs: Record<string, AgentOutput>;
   isBoomerangRunning: boolean;
+  timelineEvents: TimelineEvent[];
 }
 
 interface CanvasActions {
@@ -35,6 +64,7 @@ interface CanvasActions {
   startBoomerang: () => void;
   stopBoomerang: () => void;
   setAgentOutput: (agentName: AgentName, output: Partial<AgentOutput>) => void;
+  addTimelineEvent: (event: TimelineEvent) => void;
   clearOutputs: () => void;
 }
 
@@ -44,6 +74,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>(
     activePerspective: null,
     agentOutputs: {},
     isBoomerangRunning: false,
+    timelineEvents: [],
 
     setActiveJourneyId: (id) => set({ activeJourneyId: id }),
 
@@ -73,7 +104,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>(
           costUsd: 0,
         };
       }
-      set({ isBoomerangRunning: true, agentOutputs: initial });
+      set({ isBoomerangRunning: true, agentOutputs: initial, timelineEvents: [] });
     },
 
     stopBoomerang: () => set({ isBoomerangRunning: false }),
@@ -89,7 +120,11 @@ export const useCanvasStore = create<CanvasState & CanvasActions>(
       });
     },
 
-    clearOutputs: () => set({ agentOutputs: {}, isBoomerangRunning: false }),
+    addTimelineEvent: (event) =>
+      set((state) => ({ timelineEvents: [...state.timelineEvents, event] })),
+
+    clearOutputs: () =>
+      set({ agentOutputs: {}, isBoomerangRunning: false, timelineEvents: [] }),
   }),
 );
 

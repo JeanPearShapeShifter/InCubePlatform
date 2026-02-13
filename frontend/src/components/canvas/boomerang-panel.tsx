@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetContent,
@@ -26,7 +27,8 @@ import { useCanvasStore, AGENTS } from "@/stores/canvas-store";
 import type { AgentOutput } from "@/stores/canvas-store";
 import { useJourneyStore } from "@/stores/journey-store";
 import { connectSSE } from "@/lib/sse";
-import type { AgentName } from "@/types";
+import { ConversationTimeline } from "./conversation-timeline";
+import type { AgentName, ChallengeSeverity, ChallengeResolution } from "@/types";
 
 const STALL_TIMEOUT_MS = 90_000;
 
@@ -81,10 +83,13 @@ export function BoomerangPanel({
     isBoomerangRunning,
     stopBoomerang,
     setAgentOutput,
+    addTimelineEvent,
+    timelineEvents,
   } = useCanvasStore();
   const { updatePerspectiveStatus, fetchPerspectives, activeJourney } =
     useJourneyStore();
   const abortRef = useRef<AbortController | null>(null);
+  const scrollSentinelRef = useRef<HTMLDivElement | null>(null);
   const [phaseMessage, setPhaseMessage] = useState<string>("");
   const [isStalled, setIsStalled] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
@@ -153,9 +158,19 @@ export function BoomerangPanel({
             switch (event.event) {
               case "phase":
                 setPhaseMessage(data.message ?? "");
+                addTimelineEvent({
+                  type: "phase",
+                  timestamp: Date.now(),
+                  message: data.message ?? "",
+                });
                 break;
               case "agent_start":
                 setAgentOutput(agentName, { status: "running" });
+                addTimelineEvent({
+                  type: "agent_start",
+                  timestamp: Date.now(),
+                  agent: agentName,
+                });
                 break;
               case "agent_chunk": {
                 const current = useCanvasStore.getState().agentOutputs[agentName];
@@ -164,23 +179,41 @@ export function BoomerangPanel({
                 });
                 break;
               }
-              case "agent_complete":
+              case "agent_complete": {
+                const completeContent =
+                  data.content ??
+                  useCanvasStore.getState().agentOutputs[agentName]?.content ??
+                  "";
                 setAgentOutput(agentName, {
                   status: "complete",
-                  content:
-                    data.content ??
-                    useCanvasStore.getState().agentOutputs[agentName]?.content,
+                  content: completeContent,
                   inputTokens: data.input_tokens ?? 0,
                   outputTokens: data.output_tokens ?? 0,
                   costUsd: data.cost_usd ?? 0,
                 });
-                break;
-              case "agent_error":
-                setAgentOutput((agentName ?? "axiom") as AgentName, {
-                  status: "error",
-                  content: data.error ?? "Agent failed",
+                addTimelineEvent({
+                  type: "agent_complete",
+                  timestamp: Date.now(),
+                  agent: agentName,
+                  snippet: (completeContent as string).slice(0, 150),
                 });
                 break;
+              }
+              case "agent_error": {
+                const errorAgent = (agentName ?? "axiom") as AgentName;
+                const errorMsg = (data.error as string) ?? "Agent failed";
+                setAgentOutput(errorAgent, {
+                  status: "error",
+                  content: errorMsg,
+                });
+                addTimelineEvent({
+                  type: "agent_error",
+                  timestamp: Date.now(),
+                  agent: errorAgent,
+                  error: errorMsg,
+                });
+                break;
+              }
               case "boomerang_error": {
                 const errorType = (data.error_type as string) ?? "unknown";
                 const errorMsg = getFatalErrorMessage(
@@ -208,18 +241,33 @@ export function BoomerangPanel({
                     `**Challenge** (${data.severity ?? "medium"}): ${data.challenge_text ?? ""}\n\n`,
                 });
                 setPhaseMessage("Axiom raised a challenge...");
+                addTimelineEvent({
+                  type: "axiom_challenge",
+                  timestamp: Date.now(),
+                  agents: (data.targeted_agents as string[]) ?? [(data.agent as string) ?? ""],
+                  challengeText: (data.challenge_text as string) ?? "",
+                  severity: ((data.severity as string) ?? "medium") as ChallengeSeverity,
+                });
                 break;
-              case "challenge_response":
+              case "challenge_response": {
+                const responseText = (data.response as string) ?? "";
                 setAgentOutput("axiom", {
                   status: "running",
                   content:
                     getAxiomContent() +
-                    `**${data.agent ?? "Agent"} responds**: ${data.response ?? ""}\n\n`,
+                    `**${data.agent ?? "Agent"} responds**: ${responseText}\n\n`,
                 });
                 setPhaseMessage(
                   `${(data.agent as string)?.charAt(0).toUpperCase()}${(data.agent as string)?.slice(1) ?? "Agent"} responding to challenge...`,
                 );
+                addTimelineEvent({
+                  type: "challenge_response",
+                  timestamp: Date.now(),
+                  agent: (data.agent as string) ?? "",
+                  response: responseText.slice(0, 200),
+                });
                 break;
+              }
               case "axiom_verdict":
                 setAgentOutput("axiom", {
                   status: "running",
@@ -228,6 +276,12 @@ export function BoomerangPanel({
                     `**Verdict** (${data.resolution ?? ""}): ${data.resolution_text ?? ""}\n\n`,
                 });
                 setPhaseMessage("Axiom delivered verdict");
+                addTimelineEvent({
+                  type: "axiom_verdict",
+                  timestamp: Date.now(),
+                  resolution: ((data.resolution as string) ?? "") as ChallengeResolution,
+                  resolutionText: (data.resolution_text as string) ?? "",
+                });
                 break;
               case "boomerang_complete": {
                 const axiomState =
@@ -286,6 +340,11 @@ export function BoomerangPanel({
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
     };
   }, [open, perspectiveId, isBoomerangRunning]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll timeline on new events
+  useEffect(() => {
+    scrollSentinelRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [timelineEvents.length]);
 
   const agents = AGENTS;
   const completedCount = Object.values(agentOutputs).filter(
@@ -460,70 +519,54 @@ export function BoomerangPanel({
                 return null;
               })()}
 
-              {agents.map((agent) => {
-                const output = agentOutputs[agent.name];
-                const status = output?.status ?? "pending";
-                const tokens = (output?.inputTokens ?? 0) + (output?.outputTokens ?? 0);
-                const cost = output?.costUsd ?? 0;
+              {/* Compact agent status rows */}
+              <div className="space-y-0.5">
+                {agents.map((agent) => {
+                  const output = agentOutputs[agent.name];
+                  const status = output?.status ?? "pending";
+                  const tokens =
+                    (output?.inputTokens ?? 0) + (output?.outputTokens ?? 0);
 
-                // When there's a fatal error banner, hide individual error content
-                // to avoid showing 8 identical error messages
-                const errorOutputs = agents
-                  .map((a) => agentOutputs[a.name])
-                  .filter((o) => o?.status === "error" && o.content);
-                const allSameError =
-                  errorOutputs.length >= 3 &&
-                  errorOutputs.every(
-                    (o) => o?.content === errorOutputs[0]?.content,
-                  );
-                const hideErrorContent =
-                  status === "error" && (fatalError != null || allSameError);
-
-                return (
-                  <div
-                    key={agent.name}
-                    className={cn(
-                      "rounded-lg border border-border p-3 transition-colors",
-                      status === "running" && "border-primary/50 bg-primary/5",
-                      status === "complete" && "bg-muted/50",
-                      status === "error" && "border-[var(--color-error)]/50 bg-[var(--color-error)]/5",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
+                  return (
+                    <div
+                      key={agent.name}
+                      className={cn(
+                        "flex items-center gap-2 rounded px-2 py-1 transition-colors",
+                        status === "running" && "bg-primary/5",
+                        status === "error" && "bg-[var(--color-error)]/5",
+                      )}
+                    >
                       <div
-                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                        className="h-2 w-2 rounded-full shrink-0"
                         style={{ backgroundColor: agent.colorVar }}
                       />
-                      <span className="text-sm font-medium flex-1">
+                      <span className="text-xs font-medium flex-1 truncate">
                         {agent.label}
                       </span>
-                      <span className="text-xs text-muted-foreground mr-1">
+                      <span className="text-[10px] text-muted-foreground">
                         {agent.role}
                       </span>
+                      {status === "complete" && tokens > 0 && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {tokens.toLocaleString()}t
+                        </span>
+                      )}
                       <StatusIcon status={status} />
                     </div>
-                    {/* Token + cost info */}
-                    {status === "complete" && tokens > 0 && (
-                      <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                        <span>{tokens.toLocaleString()} tokens</span>
-                        {cost > 0 && <span>{formatCost(cost)}</span>}
-                      </div>
-                    )}
-                    {output?.content && !hideErrorContent && (
-                      <p
-                        className={cn(
-                          "mt-1.5 text-xs line-clamp-3",
-                          status === "error"
-                            ? "text-[var(--color-error)]"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        {output.content}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+
+              {/* Timeline */}
+              {timelineEvents.length > 0 && (
+                <>
+                  <Separator className="my-2" />
+                  <ConversationTimeline />
+                </>
+              )}
+
+              {/* Auto-scroll sentinel */}
+              <div ref={scrollSentinelRef} />
             </div>
           </ScrollArea>
         </div>
