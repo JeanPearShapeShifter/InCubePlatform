@@ -2,6 +2,7 @@
 name: deploy
 description: Deploy InCube Platform to production on Motion Mind Linode VPS using Docker containers with Caddy reverse proxy. Handles backup, build, migrations, health checks, and cleanup.
 disable-model-invocation: true
+allowed-tools: Bash(git *), Bash(ssh *), Bash(rsync *), Bash(docker *), Bash(curl *)
 ---
 
 

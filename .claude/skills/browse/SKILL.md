@@ -1,6 +1,7 @@
 ---
 name: browse
 description: Visually inspect InCube Portal using agent-browser. Take screenshots, check responsive design, test forms, verify UI elements against local or production URLs.
+allowed-tools: Bash(agent-browser *), Bash(npx agent-browser*)
 ---
 
 # Browse InCube Portal with Agent Browser

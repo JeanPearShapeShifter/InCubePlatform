@@ -2,6 +2,7 @@
 name: startup
 description: Start InCube Portal development services in background tmux sessions. Supports backend (port 8000), frontend (port 3001), or all services including Docker infrastructure.
 argument-hint: [backend|frontend|all]
+allowed-tools: Bash(tmux *), Bash(docker *)
 ---
 
 

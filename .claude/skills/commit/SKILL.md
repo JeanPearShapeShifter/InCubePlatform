@@ -2,6 +2,7 @@
 name: commit
 description: Full InCube Portal commit pipeline — stage, commit, push, create PR, merge to main. Handles GitHub account switching between antikythera-agent-zero and antikythera-technologies.
 argument-hint: [commit message]
+allowed-tools: Bash(git *), Bash(gh *)
 ---
 
 

@@ -2,6 +2,7 @@
 name: at-plan-chore
 description: Create a plan for InCube Portal maintenance, refactoring, dependency updates, or infrastructure tasks. Scoped and low-risk.
 argument-hint: <chore description>
+allowed-tools: Read, Grep, Glob, Bash(git *), Bash(gh issue*)
 ---
 
 

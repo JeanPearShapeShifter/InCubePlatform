@@ -2,6 +2,7 @@
 name: install
 description: Install InCube Portal dependencies. Handles Python virtualenv + pip for backend, npm for frontend, Docker for PostgreSQL + Redis + MinIO, and Alembic migrations.
 argument-hint: [backend|frontend|all]
+allowed-tools: Bash(pip *), Bash(python *), Bash(npm *), Bash(docker *), Bash(alembic *)
 ---
 
 

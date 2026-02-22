@@ -3,6 +3,7 @@ name: prime
 description: Understand the InCube Portal codebase or a specific workspace. Explores structure, dependencies, architecture, and available tools for backend or frontend workspaces.
 context: fork
 argument-hint: [all|backend|frontend]
+allowed-tools: Read, Grep, Glob, Bash(ls *), Bash(git *)
 ---
 
 

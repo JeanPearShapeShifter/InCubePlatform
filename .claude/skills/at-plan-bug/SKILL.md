@@ -2,6 +2,7 @@
 name: at-plan-bug
 description: Create a targeted plan for fixing an InCube Portal bug. Root cause analysis, execution path tracing, minimal fix scope.
 argument-hint: <bug description or error message>
+allowed-tools: Read, Grep, Glob, Bash(git *), Bash(gh issue*)
 ---
 
 

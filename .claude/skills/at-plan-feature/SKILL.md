@@ -2,6 +2,7 @@
 name: at-plan-feature
 description: Create a detailed implementation plan for a new InCube Portal feature. Researches codebase patterns, identifies affected files, and produces a plan.md ready for implementation.
 argument-hint: <feature description>
+allowed-tools: Read, Grep, Glob, Bash(git *), Bash(gh issue*)
 ---
 
 
