@@ -1,10 +1,13 @@
 ---
-description: "Commit, PR, and merge to main"
+name: commit
+description: Full InCube Portal commit pipeline — stage, commit, push, create PR, merge to main. Handles GitHub account switching between antikythera-agent-zero and antikythera-technologies.
+argument-hint: [commit message]
 ---
+
 
 # Commit Command
 
-Full pipeline: commit → push → create PR → merge to main. No stopping to ask questions — run it all the way through.
+Full pipeline: commit -> push -> create PR -> merge to main. No stopping to ask questions — run it all the way through.
 
 ## Usage
 
@@ -21,7 +24,7 @@ Or with a message:
 
 | Repository | Required Account | Remote URL |
 |------------|------------------|------------|
-| InCubePlatform (this repo) | `antikythera-agent-zero` | github.com/JeanPearShapeShifter/InCubePlatform |
+| incube-portal (this repo) | `antikythera-agent-zero` | github.com/antikythera-agent-zero/incube-portal |
 
 **Important**: You (Wian) have two GitHub accounts:
 - `antikythera-agent-zero` - For Claude Code (this agent) to push code
@@ -156,7 +159,7 @@ If `gh auth switch` fails, stop and ask the user to run `gh auth switch --user a
 
 ### "Remote repository not found"
 ```bash
-git remote set-url origin https://github.com/JeanPearShapeShifter/InCubePlatform.git
+git remote set-url origin https://github.com/antikythera-agent-zero/incube-portal.git
 ```
 
 ### "Permission denied"

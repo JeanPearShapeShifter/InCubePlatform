@@ -1,6 +1,9 @@
 ---
-description: "Deploy InCube Platform to production"
+name: deploy
+description: Deploy InCube Platform to production on Motion Mind Linode VPS using Docker containers with Caddy reverse proxy. Handles backup, build, migrations, health checks, and cleanup.
+disable-model-invocation: true
 ---
+
 
 # Production Deployment Command
 
@@ -31,12 +34,12 @@ Deploy InCube Platform to the Motion Mind Linode VPS using Docker containers wit
 |-----------|-------|------------------|-------------------|
 | `incube-postgres` | postgres:16-alpine | 5432 | `/mnt/motionmind_volume/incube/pgdata` |
 | `incube-redis` | redis:7-alpine | 6379 | Ephemeral |
-| `incube-backend` | Built from `deploy/Dockerfile.backend` | 8000 | — |
-| `incube-frontend` | Built from `deploy/Dockerfile.frontend` | 3001 | — |
+| `incube-backend` | Built from `deploy/Dockerfile.backend` | 8000 | -- |
+| `incube-frontend` | Built from `deploy/Dockerfile.frontend` | 3001 | -- |
 | `incube-minio` | minio/minio | 9000 | `/mnt/motionmind_volume/incube/minio_data` |
 | `caddy` | *(existing, shared)* | 80/443 | Routes `incube.motionmind.antikythera.co.za` |
 
-All containers join the external `n8n-docker-caddy_motionmind-network`. No ports are exposed to host — Caddy handles all external traffic.
+All containers join the external `n8n-docker-caddy_motionmind-network`. No ports are exposed to host -- Caddy handles all external traffic.
 
 ## What It Does
 
@@ -161,7 +164,7 @@ if [ ! -f "$ENV_FILE" ]; then
     echo "Create it from .env.production.example and fill in real values."
     exit 1
 fi
-echo "→ .env.production exists"
+echo "-> .env.production exists"
 # Validate required keys are set (not placeholder values)
 for KEY in POSTGRES_PASSWORD JWT_SECRET ANTHROPIC_API_KEY MINIO_ACCESS_KEY MINIO_SECRET_KEY; do
     VAL=$(grep "^${KEY}=" "$ENV_FILE" | cut -d= -f2-)
@@ -190,16 +193,16 @@ INSTALL_DIR="/mnt/motionmind_volume/incube"
 REPO_URL="https://github.com/JeanPearShapeShifter/InCubePlatform.git"
 
 if [ -d "$INSTALL_DIR/repo/.git" ]; then
-    echo "→ Pulling latest..."
+    echo "-> Pulling latest..."
     cd "$INSTALL_DIR/repo"
     git fetch origin
     git reset --hard origin/main
 else
-    echo "→ Cloning..."
+    echo "-> Cloning..."
     mkdir -p "$INSTALL_DIR"
     git clone "$REPO_URL" "$INSTALL_DIR/repo"
 fi
-echo "→ HEAD: $(cd $INSTALL_DIR/repo && git log --oneline -1)"
+echo "-> HEAD: $(cd $INSTALL_DIR/repo && git log --oneline -1)"
 SCRIPT
 ```
 
@@ -232,7 +235,7 @@ SCRIPT
 ```bash
 ssh root@159.223.208.109 'bash -s' << 'SCRIPT'
 set -e
-echo "→ Waiting for PostgreSQL..."
+echo "-> Waiting for PostgreSQL..."
 for i in $(seq 1 30); do
     if docker exec incube-postgres pg_isready -U incube -d incube >/dev/null 2>&1; then
         echo "  PostgreSQL ready."
@@ -240,7 +243,7 @@ for i in $(seq 1 30); do
     fi
     sleep 2
 done
-echo "→ Running Alembic migrations..."
+echo "-> Running Alembic migrations..."
 docker exec incube-backend alembic upgrade head
 SCRIPT
 ```
@@ -279,9 +282,9 @@ CADDY_CONFIG="/root/n8n-docker-caddy/caddy_config/Caddyfile"
 DOMAIN="incube.motionmind.antikythera.co.za"
 
 if grep -q "$DOMAIN" "$CADDY_CONFIG" 2>/dev/null; then
-    echo "→ Caddy already configured for $DOMAIN"
+    echo "-> Caddy already configured for $DOMAIN"
 else
-    echo "→ Adding InCube block to Caddyfile..."
+    echo "-> Adding InCube block to Caddyfile..."
     cat >> "$CADDY_CONFIG" <<'CADDYEOF'
 
 incube.motionmind.antikythera.co.za {
@@ -293,7 +296,7 @@ incube.motionmind.antikythera.co.za {
     }
 }
 CADDYEOF
-    echo "→ Reloading Caddy..."
+    echo "-> Reloading Caddy..."
     docker exec $(docker ps -q -f name=caddy) caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null \
         || echo "  WARNING: Could not auto-reload Caddy. Reload manually."
 fi
@@ -358,8 +361,8 @@ Report to the user:
 
 If this is the first deployment, remind the user:
 
-1. **DNS**: Ensure A record `incube.motionmind.antikythera.co.za` → `159.223.208.109` exists (or wildcard `*.motionmind.antikythera.co.za`)
-2. **Secrets**: Create `.env.production` on the server — generate all credentials fresh with `openssl rand -hex`
+1. **DNS**: Ensure A record `incube.motionmind.antikythera.co.za` -> `159.223.208.109` exists (or wildcard `*.motionmind.antikythera.co.za`)
+2. **Secrets**: Create `.env.production` on the server -- generate all credentials fresh with `openssl rand -hex`
 3. **ANTHROPIC_API_KEY**: Add the API key to `.env.production` if AI agent features are needed
 
 ## Common Issues & Solutions
@@ -492,7 +495,7 @@ SCRIPT
 ## Security Reminders
 
 - Never commit `deploy/.env.production` with real secrets to Git
-- `.env.production` is gitignored — secrets only exist on the server
+- `.env.production` is gitignored -- secrets only exist on the server
 - Rotate JWT_SECRET and API keys regularly
 - Use SSH key authentication (not passwords)
 - Keep Docker and system packages updated

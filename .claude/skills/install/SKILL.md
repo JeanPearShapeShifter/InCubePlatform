@@ -1,10 +1,13 @@
 ---
-description: "Install InCube Platform dependencies"
+name: install
+description: Install InCube Portal dependencies. Handles Python virtualenv + pip for backend, npm for frontend, Docker for PostgreSQL + Redis + MinIO, and Alembic migrations.
+argument-hint: [backend|frontend|all]
 ---
+
 
 # Install Workspace
 
-Install InCube Platform dependencies for development.
+Install InCube Portal dependencies for development.
 
 ## Workspace Selection
 
@@ -57,9 +60,20 @@ Execute each in order:
 | frontend | Next.js 15 + React 19 | Node.js 18+, npm |
 | infrastructure | PostgreSQL + Redis + MinIO | Docker |
 
+## Port Mappings (Development)
+
+| Service | Host Port | Container Port | Notes |
+|---------|-----------|----------------|-------|
+| PostgreSQL | 5435 | 5432 | Avoids conflict with local PostgreSQL |
+| Redis | 6380 | 6379 | Avoids conflict with local Redis |
+| MinIO API | 9002 | 9000 | S3-compatible API |
+| MinIO Console | 9003 | 9001 | Web console (incube/incube_dev) |
+
 ## Notes
 
 - Backend requires Python 3.12+ and Docker (for PostgreSQL, Redis, MinIO)
-- Dev PostgreSQL exposes on host port **5434** (not 5432) to avoid conflicts
-- MinIO console available at http://localhost:9001 (incube/incube_dev)
+- Dev PostgreSQL exposes on host port **5435** (not 5432) to avoid conflicts
+- Dev Redis exposes on host port **6380** (not 6379) to avoid conflicts
+- MinIO console available at http://localhost:9003 (credentials: incube/incube_dev)
 - Frontend requires Node.js 18+
+- Frontend dev server runs on port **3001** (configured in package.json)
